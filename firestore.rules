@@ -1,0 +1,26 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Books collection - public read, admin-only write
+    match /books/{bookId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.admin == true;
+
+      // Loan history subcollection
+      match /loanHistory/{loanId} {
+        allow read: if true;
+        allow write: if request.auth != null
+          && request.auth.token.admin == true;
+      }
+    }
+
+    // Genres collection (optional)
+    match /genres/{genreId} {
+      allow read: if true;
+      allow write: if request.auth != null
+        && request.auth.token.admin == true;
+    }
+  }
+}

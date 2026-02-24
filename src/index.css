@@ -1,0 +1,19 @@
+body {
+  margin: 0;
+  direction: rtl;
+  text-align: start;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.MuiInputLabel-root,
+.MuiFormLabel-root {
+  right: 0 !important;
+  left: auto !important;
+  transform-origin: top right !important;
+  text-align: right !important;
+  width: 100%;
+}
