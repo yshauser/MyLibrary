@@ -1,0 +1,15 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // SPA redirect for GitHub Pages
+      // Redirects all 404s back to index.html preserving the path
+      const path = window.location.pathname;
+      const base = '/MyLibrary';
+      sessionStorage.setItem('redirect', path.startsWith(base) ? path.slice(base.length) : path);
+      window.location.replace(window.location.origin + base + '/');
+    </script>
+  </head>
+  <body></body>
+</html>
