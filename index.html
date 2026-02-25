@@ -14,9 +14,7 @@
         var redirect = sessionStorage.getItem('redirect');
         if (redirect) {
           sessionStorage.removeItem('redirect');
-          if (redirect !== '/') {
-            window.history.replaceState(null, '', redirect);
-          }
+          window.history.replaceState(null, '', redirect);
         }
       })();
     </script>
