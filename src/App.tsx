@@ -17,7 +17,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/MyLibrary">
       <Layout>
         <Routes>
           <Route path="/" element={<LibraryPage />} />
