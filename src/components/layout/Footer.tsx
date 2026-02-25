@@ -43,6 +43,8 @@ export default function Footer() {
       handleLogin();
     }
   };
+  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+
 
   return (
     <>
@@ -63,6 +65,10 @@ export default function Footer() {
         <Typography variant="body2" color="text.secondary">
           הספרייה שלי © {new Date().getFullYear()}
         </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {`v${version}`} 
+        </Typography>
+                
         {!isAdmin && (
           <Tooltip title="כניסת מנהל">
             <IconButton
