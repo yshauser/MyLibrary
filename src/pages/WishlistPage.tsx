@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -8,6 +8,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Paper,
   CircularProgress,
   IconButton,
@@ -27,6 +28,22 @@ import { wishlistService } from '../services/wishlistService';
 import type { WishlistItem, WishlistFormData } from '../types/wishlist';
 import { useAuth } from '../contexts/AuthContext';
 
+type SortKey = keyof Omit<WishlistItem, 'id' | 'dateAdded'>;
+type SortOrder = 'asc' | 'desc';
+
+function compareValues(a: string | undefined, b: string | undefined, order: SortOrder): number {
+  const empty = order === 'asc' ? 1 : -1;
+  if (!a && !b) return 0;
+  if (!a) return empty;
+  if (!b) return -empty;
+  const numA = Number(a);
+  const numB = Number(b);
+  if (!isNaN(numA) && !isNaN(numB)) {
+    return order === 'asc' ? numA - numB : numB - numA;
+  }
+  return order === 'asc' ? a.localeCompare(b, 'he') : b.localeCompare(a, 'he');
+}
+
 const emptyForm: WishlistFormData = {
   bookName: '',
   seriesName: '',
@@ -40,6 +57,28 @@ export default function WishlistPage() {
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('seriesName');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc');
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder((o) => (o === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setSortOrder('asc');
+    }
+  };
+
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const primary = compareValues(a[sortKey] as string | undefined, b[sortKey] as string | undefined, sortOrder);
+      if (primary !== 0) return primary;
+      if (sortKey !== 'bookVolume') {
+        return compareValues(a.bookVolume, b.bookVolume, 'asc');
+      }
+      return 0;
+    });
+  }, [items, sortKey, sortOrder]);
 
   const [addForm, setAddForm] = useState<WishlistFormData>({ ...emptyForm });
   const [adding, setAdding] = useState(false);
@@ -143,11 +182,41 @@ export default function WishlistPage() {
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell>שם הספר *</TableCell>
-              <TableCell>סדרה</TableCell>
-              <TableCell>כרך</TableCell>
-              <TableCell>מחבר</TableCell>
-              <TableCell>הוצאה לאור</TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === 'bookName'}
+                  direction={sortKey === 'bookName' ? sortOrder : 'asc'}
+                  onClick={() => handleSort('bookName')}
+                >שם הספר</TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === 'seriesName'}
+                  direction={sortKey === 'seriesName' ? sortOrder : 'asc'}
+                  onClick={() => handleSort('seriesName')}
+                >סדרה</TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === 'bookVolume'}
+                  direction={sortKey === 'bookVolume' ? sortOrder : 'asc'}
+                  onClick={() => handleSort('bookVolume')}
+                >כרך</TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === 'author'}
+                  direction={sortKey === 'author' ? sortOrder : 'asc'}
+                  onClick={() => handleSort('author')}
+                >מחבר</TableSortLabel>
+              </TableCell>
+              <TableCell>
+                <TableSortLabel
+                  active={sortKey === 'publishingHouse'}
+                  direction={sortKey === 'publishingHouse' ? sortOrder : 'asc'}
+                  onClick={() => handleSort('publishingHouse')}
+                >הוצאה לאור</TableSortLabel>
+              </TableCell>
               {isAdmin && <TableCell sx={{ width: 96 }}></TableCell>}
             </TableRow>
           </TableHead>
@@ -223,7 +292,7 @@ export default function WishlistPage() {
               </TableRow>
             )}
 
-            {items.map((item) => (
+            {sortedItems.map((item) => (
               <TableRow key={item.id} hover>
                 {editId === item.id ? (
                   <>

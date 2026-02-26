@@ -2,6 +2,8 @@ import {
   collection,
   addDoc,
   getDocs,
+  doc,
+  updateDoc,
   query,
   orderBy,
   Timestamp,
@@ -38,5 +40,14 @@ export const activityLogService = {
       id: doc.id,
       ...doc.data(),
     })) as ActivityLogEntry[];
+  },
+
+  async updateEntry(id: string, data: Partial<Omit<ActivityLogEntry, 'id'>>): Promise<void> {
+    const docRef = doc(db, COLLECTION_NAME, id);
+    const clean: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(data)) {
+      if (value !== undefined) clean[key] = value;
+    }
+    await updateDoc(docRef, clean);
   },
 };
