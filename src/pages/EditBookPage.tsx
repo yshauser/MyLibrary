@@ -4,10 +4,12 @@ import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/materia
 import type { Book, BookFormData } from '../types/book';
 import { bookService } from '../services/bookService';
 import BookForm from '../components/books/BookForm';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function EditBookPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [book, setBook] = useState<Book | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,7 @@ export default function EditBookPage() {
     try {
       console.log('[EditBook] Updating book id:', id);
       console.log('[EditBook] Data:', JSON.stringify(data, null, 2));
-      await bookService.updateBook(id, data);
+      await bookService.updateBook(id, data, user?.email ?? undefined);
       console.log('[EditBook] Update successful');
       navigate('/', { state: { message: 'הספר עודכן בהצלחה' } });
     } catch (err: unknown) {

@@ -4,9 +4,11 @@ import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/materia
 import type { BookFormData } from '../types/book';
 import { bookService } from '../services/bookService';
 import BookForm from '../components/books/BookForm';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function AddBookPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [nextId, setNextId] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export default function AddBookPage() {
     setLoading(true);
     setError('');
     try {
-      await bookService.addBook(data);
+      await bookService.addBook(data, user?.email ?? undefined);
       navigate('/', { state: { message: 'הספר נוסף בהצלחה' } });
     } catch (err) {
       console.error('Error adding book:', err);

@@ -6,6 +6,8 @@ import EditBookPage from './pages/EditBookPage';
 import ExportPage from './pages/ExportPage';
 import ImportPage from './pages/ImportPage';
 import DashboardPage from './pages/DashboardPage';
+import ActivityLogPage from './pages/ActivityLogPage';
+import WishlistPage from './pages/WishlistPage';
 import { useAuth } from './contexts/AuthContext';
 
 function AdminRoute({ children }: { children: React.ReactNode }) {
@@ -51,6 +53,15 @@ function App() {
             element={
               <AdminRoute>
                 <ImportPage />
+              </AdminRoute>
+            }
+          />
+          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route
+            path="/log"
+            element={
+              <AdminRoute>
+                <ActivityLogPage />
               </AdminRoute>
             }
           />

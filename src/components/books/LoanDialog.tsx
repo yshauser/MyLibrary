@@ -22,6 +22,7 @@ import {
 } from '@mui/material';
 import type { Book, LoanRecord } from '../../types/book';
 import { loanService } from '../../services/loanService';
+import { auth } from '../../config/firebase';
 
 interface LoanDialogProps {
   book: Book | null;
@@ -67,7 +68,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
     if (!book || !loanerName) return;
     setLoading(true);
     try {
-      await loanService.loanBook(book.id, loanerName, new Date(loanDate));
+      await loanService.loanBook(book.id, loanerName, new Date(loanDate), book.title, auth.currentUser?.email ?? undefined);
       setLoanerName('');
       onLoanUpdated();
       onClose();
@@ -84,7 +85,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
     if (!activeLoan) return;
     setLoading(true);
     try {
-      await loanService.returnBook(book.id, activeLoan.id, new Date(returnDate));
+      await loanService.returnBook(book.id, activeLoan.id, new Date(returnDate), book.title, book.currentLoan?.loanerName, auth.currentUser?.email ?? undefined);
       onLoanUpdated();
       onClose();
     } catch (error) {

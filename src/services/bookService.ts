@@ -19,6 +19,7 @@ import {
 import { db } from '../config/firebase';
 import type { Book, BookFormData } from '../types/book';
 import { BOOKS_PER_PAGE } from '../config/constants';
+import { activityLogService } from './activityLogService';
 
 const COLLECTION_NAME = 'books';
 const booksRef = collection(db, COLLECTION_NAME);
@@ -96,23 +97,32 @@ export const bookService = {
     return { id: snapshot.id, ...snapshot.data() } as Book;
   },
 
-  async addBook(bookData: BookFormData): Promise<string> {
+  async addBook(bookData: BookFormData, performedBy?: string): Promise<string> {
     const dataToSave = removeUndefined({
       ...bookData,
       dateAdded: Timestamp.now(),
     });
     const docRef = await addDoc(booksRef, dataToSave);
+    if (performedBy) {
+      activityLogService.logAction('add', bookData.title, docRef.id, performedBy).catch(() => {});
+    }
     return docRef.id;
   },
 
-  async updateBook(id: string, bookData: Partial<BookFormData>): Promise<void> {
+  async updateBook(id: string, bookData: Partial<BookFormData>, performedBy?: string): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);
     await updateDoc(docRef, removeUndefined(bookData as Record<string, unknown>));
+    if (performedBy && bookData.title) {
+      activityLogService.logAction('edit', bookData.title, id, performedBy).catch(() => {});
+    }
   },
 
-  async deleteBook(id: string): Promise<void> {
+  async deleteBook(id: string, bookTitle?: string, performedBy?: string): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);
     await deleteDoc(docRef);
+    if (performedBy && bookTitle) {
+      activityLogService.logAction('delete', bookTitle, id, performedBy).catch(() => {});
+    }
   },
 
   async batchAddBooks(books: BookFormData[]): Promise<number> {

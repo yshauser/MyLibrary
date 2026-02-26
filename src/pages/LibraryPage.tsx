@@ -6,6 +6,7 @@ import BookTable from '../components/books/BookTable';
 import DeleteConfirmDialog from '../components/books/DeleteConfirmDialog';
 import LoanDialog from '../components/books/LoanDialog';
 import { useAuth } from '../contexts/AuthContext';
+import { auth } from '../config/firebase';
 
 export default function LibraryPage() {
   const { isAdmin } = useAuth();
@@ -40,7 +41,7 @@ export default function LibraryPage() {
     if (!deleteBook) return;
     setDeleteLoading(true);
     try {
-      await bookService.deleteBook(deleteBook.id);
+      await bookService.deleteBook(deleteBook.id, deleteBook.title, auth.currentUser?.email ?? undefined);
       setBooks((prev) => prev.filter((b) => b.id !== deleteBook.id));
       setSnackbar({ open: true, message: 'הספר נמחק בהצלחה', severity: 'success' });
     } catch (error) {
