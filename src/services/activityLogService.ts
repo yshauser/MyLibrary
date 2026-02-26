@@ -4,6 +4,7 @@ import {
   getDocs,
   doc,
   updateDoc,
+  deleteDoc,
   query,
   orderBy,
   Timestamp,
@@ -40,6 +41,28 @@ export const activityLogService = {
       id: doc.id,
       ...doc.data(),
     })) as ActivityLogEntry[];
+  },
+
+  async addManualEntry(
+    actionType: ActivityType,
+    actionDate: string,
+    bookTitle: string,
+    performedBy: string,
+    loanerName?: string
+  ): Promise<void> {
+    const entry: Record<string, unknown> = {
+      actionType,
+      actionDate: Timestamp.fromDate(new Date(actionDate)),
+      bookTitle,
+      bookId: 'manual',
+      performedBy,
+    };
+    if (loanerName?.trim()) entry.loanerName = loanerName.trim();
+    await addDoc(logRef, entry);
+  },
+
+  async deleteEntry(id: string): Promise<void> {
+    await deleteDoc(doc(db, COLLECTION_NAME, id));
   },
 
   async updateEntry(id: string, data: Partial<Omit<ActivityLogEntry, 'id'>>): Promise<void> {
