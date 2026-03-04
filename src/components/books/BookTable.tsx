@@ -100,7 +100,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     let filtered = [...books];
 
     if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+      const q = searchQuery.trim().toLowerCase();
       filtered = filtered.filter(
         (book) =>
           book.title?.toLowerCase().includes(q) ||
