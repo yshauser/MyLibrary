@@ -22,6 +22,7 @@ import {
   Stack,
   InputAdornment,
   Tooltip,
+  CircularProgress,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import {
@@ -29,8 +30,10 @@ import {
   Remove as RemoveIcon,
   ExpandMore as ExpandMoreIcon,
   CameraAlt as CameraAltIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import IsbnScanner from './IsbnScanner';
+import { fetchBookByIsbn } from '../../services/googleBooksService';
 import type { Book, BookFormData, Author } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 
@@ -75,9 +78,45 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
     initialData?.personalRating || null
   );
 
-  // Series state
   const [scannerOpen, setScannerOpen] = useState(false);
   const [additionalExpanded, setAdditionalExpanded] = useState(!!initialData?.isbn);
+  const [lookingUp, setLookingUp] = useState(false);
+  const [lookupError, setLookupError] = useState('');
+
+  const handleGoogleBooksLookup = async () => {
+    if (!isbn) return;
+    setLookingUp(true);
+    setLookupError('');
+    try {
+      const data = await fetchBookByIsbn(isbn.replace(/[^0-9X]/gi, ''));
+      if (!data) {
+        setLookupError('לא נמצא ספר עם ISBN זה בגוגל ספרים');
+        return;
+      }
+      if (data.title && !title) setTitle(data.title);
+      if (data.originalTitle && !originalTitle) setOriginalTitle(data.originalTitle);
+      if (data.authors?.length && (!authors.length || (authors.length === 1 && !authors[0].firstName && !authors[0].lastName))) {
+        setAuthors(data.authors.map((name) => {
+          const parts = name.trim().split(' ');
+          const lastName = parts.pop() || '';
+          const firstName = parts.join(' ');
+          return { firstName, lastName };
+        }));
+      }
+      if (data.publishingHouse && !publishingHouse) setPublishingHouse(data.publishingHouse);
+      if (data.publishedYear && !publishedYear) setPublishedYear(String(data.publishedYear));
+      if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
+      if (data.language && !language) setLanguage(data.language);
+      if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
+      setAdditionalExpanded(true);
+    } catch {
+      setLookupError('שגיאה בחיפוש בגוגל ספרים');
+    } finally {
+      setLookingUp(false);
+    }
+  };
+
+  // Series state
 
   const [hasSeries, setHasSeries] = useState(!!initialData?.series?.name);
   const [seriesName, setSeriesName] = useState(initialData?.series?.name || '');
@@ -272,25 +311,41 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
             <AccordionDetails>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="ISBN"
-                    value={isbn}
-                    onChange={(e) => setIsbn(e.target.value)}
-                    slotProps={{
-                      input: {
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Tooltip title="סרוק ISBN מהמצלמה">
-                              <IconButton size="small" onClick={() => setScannerOpen(true)} edge="end">
-                                <CameraAltIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <TextField
+                      fullWidth
+                      label="ISBN"
+                      value={isbn}
+                      onChange={(e) => { setIsbn(e.target.value); setLookupError(''); }}
+                      error={!!lookupError}
+                      helperText={lookupError}
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Tooltip title="סרוק ISBN מהמצלמה">
+                                <IconButton size="small" onClick={() => setScannerOpen(true)} edge="end">
+                                  <CameraAltIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <Tooltip title="חפש פרטי ספר לפי ISBN בגוגל ספרים">
+                      <span>
+                        <IconButton
+                          onClick={handleGoogleBooksLookup}
+                          disabled={!isbn || lookingUp}
+                          color="primary"
+                          sx={{ mt: 1 }}
+                        >
+                          {lookingUp ? <CircularProgress size={20} /> : <SearchIcon />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="שנת הוצאה" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} />
