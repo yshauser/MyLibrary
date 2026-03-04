@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -326,9 +326,8 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           </TableHead>
           <TableBody>
             {paginatedBooks.map((book) => (
-              <>
+              <React.Fragment key={book.id}>
                 <TableRow
-                  key={book.id}
                   hover
                   sx={{ cursor: 'pointer', '& > *': { borderBottom: expandedRow === book.id ? 'unset' : undefined } }}
                   onClick={() => setExpandedRow(expandedRow === book.id ? null : book.id)}
@@ -404,14 +403,14 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
                     </TableCell>
                   )}
                 </TableRow>
-                <TableRow key={`${book.id}-expand`}>
+                <TableRow>
                   <TableCell sx={{ py: 0 }} colSpan={isAdmin ? (isMobile ? 5 : 9) : (isMobile ? 4 : 8)}>
                     <Collapse in={expandedRow === book.id} timeout="auto" unmountOnExit>
                       <BookExpandedRow book={book} />
                     </Collapse>
                   </TableCell>
                 </TableRow>
-              </>
+              </React.Fragment>
             ))}
             {paginatedBooks.length === 0 && (
               <TableRow>

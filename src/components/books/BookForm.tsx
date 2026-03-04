@@ -20,13 +20,17 @@ import {
   FormControlLabel,
   OutlinedInput,
   Stack,
+  InputAdornment,
+  Tooltip,
 } from '@mui/material';
 import type { SelectChangeEvent } from '@mui/material';
 import {
   Add as AddIcon,
   Remove as RemoveIcon,
   ExpandMore as ExpandMoreIcon,
+  CameraAlt as CameraAltIcon,
 } from '@mui/icons-material';
+import IsbnScanner from './IsbnScanner';
 import type { Book, BookFormData, Author } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 
@@ -72,6 +76,9 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
   );
 
   // Series state
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [additionalExpanded, setAdditionalExpanded] = useState(!!initialData?.isbn);
+
   const [hasSeries, setHasSeries] = useState(!!initialData?.series?.name);
   const [seriesName, setSeriesName] = useState(initialData?.series?.name || '');
   const [volumeNumber, setVolumeNumber] = useState<string>(
@@ -258,14 +265,32 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
           </Grid>
 
           {/* Additional Info */}
-          <Accordion defaultExpanded={!!initialData?.isbn}>
+          <Accordion expanded={additionalExpanded} onChange={(_, expanded) => setAdditionalExpanded(expanded)}>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
               <Typography variant="h6" color="primary">פרטים נוספים</Typography>
             </AccordionSummary>
             <AccordionDetails>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 4 }}>
-                  <TextField fullWidth label="ISBN" value={isbn} onChange={(e) => setIsbn(e.target.value)} />
+                  <TextField
+                    fullWidth
+                    label="ISBN"
+                    value={isbn}
+                    onChange={(e) => setIsbn(e.target.value)}
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <Tooltip title="סרוק ISBN מהמצלמה">
+                              <IconButton size="small" onClick={() => setScannerOpen(true)} edge="end">
+                                <CameraAltIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </InputAdornment>
+                        ),
+                      },
+                    }}
+                  />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="שנת הוצאה" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} />
@@ -387,6 +412,16 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
           </Box>
         </Stack>
       </form>
+
+      <IsbnScanner
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={(scanned) => {
+          setIsbn(scanned);
+          setAdditionalExpanded(true);
+          setScannerOpen(false);
+        }}
+      />
     </Paper>
   );
 }
