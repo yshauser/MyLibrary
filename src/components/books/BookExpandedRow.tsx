@@ -107,7 +107,7 @@ export default function BookExpandedRow({ book }: BookExpandedRowProps) {
               <Typography variant="caption" color="text.secondary">
                 דירוג אישי:
               </Typography>
-              <Rating value={book.personalRating} readOnly size="small" sx={{ display: 'block', mt: 0.5 }} />
+              <Rating value={book.personalRating} readOnly size="small" sx={{ display: 'flex', mt: 0.5 }} />
             </Box>
           )}
         </Grid>

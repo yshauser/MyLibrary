@@ -31,14 +31,14 @@ function extractIsbn(text: string): string | null {
       }
     }
   }
-  // Second try: find 13 or 10 consecutive digits
-  const match = text.match(/\b(\d{13}|\d{10})\b/);
-  if (match) return match[1];
-  // Third try: remove all non-digits from ISBN-labelled line
+  // Second try: find 13 digits or 9 digits followed by digit or X (ISBN-10)
+  const match = text.match(/\b(\d{13}|\d{9}[\dX])\b/i);
+  if (match) return match[1].toUpperCase();
+  // Third try: remove all non-digits/X from ISBN-labelled line
   const isbnLine = text.split('\n').find(l => /isbn/i.test(l));
   if (isbnLine) {
-    const digits = isbnLine.replace(/[^0-9]/g, '');
-    if (digits.length === 13 || digits.length === 10) return digits;
+    const cleaned = isbnLine.replace(/[^0-9X]/gi, '').toUpperCase();
+    if (cleaned.length === 13 || (cleaned.length === 10 && /^\d{9}[\dX]$/.test(cleaned))) return cleaned;
   }
   return null;
 }

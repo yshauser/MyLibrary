@@ -34,6 +34,7 @@ import {
 } from '@mui/icons-material';
 import IsbnScanner from './IsbnScanner';
 import { fetchBookByIsbn } from '../../services/googleBooksService';
+import { fetchBookFromNli } from '../../services/nliService';
 import type { Book, BookFormData, Author } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 
@@ -88,11 +89,19 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
     setLookingUp(true);
     setLookupError('');
     try {
-      const data = await fetchBookByIsbn(isbn.replace(/[^0-9X]/gi, ''));
+      const cleanIsbn = isbn.replace(/[^0-9X]/gi, '').toUpperCase();
+
+      let data = await fetchBookFromNli(cleanIsbn);
       if (!data) {
-        setLookupError('לא נמצא ספר עם ISBN זה בגוגל ספרים');
+        console.log('NLI returned no results, falling back to Google Books');
+        data = await fetchBookByIsbn(cleanIsbn);
+      }
+
+      if (!data) {
+        setLookupError('לא נמצא ספר עם ISBN זה');
         return;
       }
+
       if (data.title && !title) setTitle(data.title);
       if (data.originalTitle && !originalTitle) setOriginalTitle(data.originalTitle);
       if (data.authors?.length && (!authors.length || (authors.length === 1 && !authors[0].firstName && !authors[0].lastName))) {
@@ -103,6 +112,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
           return { firstName, lastName };
         }));
       }
+      if (data.translatedBy && !translatedBy) setTranslatedBy(data.translatedBy);
       if (data.publishingHouse && !publishingHouse) setPublishingHouse(data.publishingHouse);
       if (data.publishedYear && !publishedYear) setPublishedYear(String(data.publishedYear));
       if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
@@ -110,7 +120,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
       if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
       setAdditionalExpanded(true);
     } catch {
-      setLookupError('שגיאה בחיפוש בגוגל ספרים');
+      setLookupError('שגיאה בחיפוש פרטי הספר');
     } finally {
       setLookingUp(false);
     }

@@ -2,6 +2,7 @@ export interface GoogleBookData {
   title?: string;
   originalTitle?: string;
   authors?: string[];
+  translatedBy?: string;
   publishedYear?: number;
   publishingHouse?: string;
   language?: string;
