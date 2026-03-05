@@ -16,6 +16,18 @@ import {
   TextField,
   Button,
   Alert,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
+  Fab,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Stack,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
@@ -54,6 +66,8 @@ const emptyForm: WishlistFormData = {
 
 export default function WishlistPage() {
   const { isAdmin } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [items, setItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -82,6 +96,7 @@ export default function WishlistPage() {
 
   const [addForm, setAddForm] = useState<WishlistFormData>({ ...emptyForm });
   const [adding, setAdding] = useState(false);
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<WishlistFormData>({ ...emptyForm });
@@ -162,10 +177,133 @@ export default function WishlistPage() {
     }
   };
 
+  const handleAddFromDialog = async () => {
+    await handleAdd();
+    setAddDialogOpen(false);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <Box sx={{ pb: 8 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontWeight: 700 }}>
+          רשימת משאלות
+        </Typography>
+
+        {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>{error}</Alert>}
+
+        {sortedItems.length === 0 && (
+          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+            רשימת המשאלות ריקה
+          </Typography>
+        )}
+
+        {sortedItems.map((item) => (
+          <Card key={item.id} variant="outlined" sx={{ mb: 1.5, borderRadius: 2 }}>
+            {editId === item.id ? (
+              <CardContent>
+                <Stack spacing={1.5}>
+                  <TextField size="small" fullWidth label="שם הספר *" value={editForm.bookName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, bookName: e.target.value }))} />
+                  <TextField size="small" fullWidth label="סדרה" value={editForm.seriesName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, seriesName: e.target.value }))} />
+                  <TextField size="small" fullWidth label="כרך" value={editForm.bookVolume}
+                    onChange={(e) => setEditForm((f) => ({ ...f, bookVolume: e.target.value }))} />
+                  <TextField size="small" fullWidth label="מחבר" value={editForm.author}
+                    onChange={(e) => setEditForm((f) => ({ ...f, author: e.target.value }))} />
+                  <TextField size="small" fullWidth label="הוצאה לאור" value={editForm.publishingHouse}
+                    onChange={(e) => setEditForm((f) => ({ ...f, publishingHouse: e.target.value }))} />
+                </Stack>
+                <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+                  <Button variant="contained" size="small" startIcon={<SaveIcon />}
+                    onClick={handleSaveEdit} disabled={saving}>
+                    שמור
+                  </Button>
+                  <Button variant="outlined" size="small" startIcon={<CancelIcon />}
+                    onClick={() => setEditId(null)}>
+                    ביטול
+                  </Button>
+                </Box>
+              </CardContent>
+            ) : (
+              <>
+                <CardContent sx={{ pb: '8px !important' }}>
+                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{item.bookName}</Typography>
+                  {item.seriesName && (
+                    <Typography variant="body2" color="text.secondary">
+                      סדרה: {item.seriesName}{item.bookVolume ? ` (כרך ${item.bookVolume})` : ''}
+                    </Typography>
+                  )}
+                  {item.author && (
+                    <Typography variant="body2" color="text.secondary">מחבר: {item.author}</Typography>
+                  )}
+                  {item.publishingHouse && (
+                    <Typography variant="body2" color="text.secondary">הוצאה לאור: {item.publishingHouse}</Typography>
+                  )}
+                </CardContent>
+                {isAdmin && (
+                  <>
+                    <Divider />
+                    <CardActions sx={{ justifyContent: 'flex-end', py: 0.5 }}>
+                      <Tooltip title="עריכה">
+                        <IconButton onClick={() => startEdit(item)}>
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="מחיקה">
+                        <IconButton color="error" onClick={() => handleDelete(item.id)}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </CardActions>
+                  </>
+                )}
+              </>
+            )}
+          </Card>
+        ))}
+
+        {isAdmin && (
+          <Fab
+            color="primary"
+            sx={{ position: 'fixed', bottom: 16, left: 16 }}
+            onClick={() => setAddDialogOpen(true)}
+          >
+            <AddIcon />
+          </Fab>
+        )}
+
+        <Dialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} fullWidth maxWidth="xs">
+          <DialogTitle>הוספת ספר לרשימה</DialogTitle>
+          <DialogContent>
+            <Stack spacing={2} sx={{ mt: 1 }}>
+              <TextField size="small" fullWidth label="שם הספר *" value={addForm.bookName} required
+                onChange={(e) => setAddForm((f) => ({ ...f, bookName: e.target.value }))} />
+              <TextField size="small" fullWidth label="סדרה" value={addForm.seriesName}
+                onChange={(e) => setAddForm((f) => ({ ...f, seriesName: e.target.value }))} />
+              <TextField size="small" fullWidth label="כרך" value={addForm.bookVolume}
+                onChange={(e) => setAddForm((f) => ({ ...f, bookVolume: e.target.value }))} />
+              <TextField size="small" fullWidth label="מחבר" value={addForm.author}
+                onChange={(e) => setAddForm((f) => ({ ...f, author: e.target.value }))} />
+              <TextField size="small" fullWidth label="הוצאה לאור" value={addForm.publishingHouse}
+                onChange={(e) => setAddForm((f) => ({ ...f, publishingHouse: e.target.value }))} />
+            </Stack>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setAddDialogOpen(false)}>ביטול</Button>
+            <Button variant="contained" onClick={handleAddFromDialog}
+              disabled={adding || !addForm.bookName.trim()}>
+              {adding ? 'מוסיף...' : 'הוסף'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Box>
     );
   }

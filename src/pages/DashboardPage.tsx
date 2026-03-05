@@ -5,6 +5,8 @@ import {
   Paper,
   Grid,
   CircularProgress,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   BarChart,
@@ -43,6 +45,8 @@ function StatCard({ title, value, color = 'primary.main' }: StatCardProps) {
 }
 
 export default function DashboardPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [books, setBooks] = useState<Book[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -135,7 +139,7 @@ export default function DashboardPage() {
             <Typography variant="h6" gutterBottom>ספרים לפי ז׳אנר</Typography>
             {genreData.length > 0 ? (
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={genreData} layout="vertical" margin={{ left: 80, right: 20 }}>
+                <BarChart data={genreData} layout="vertical" margin={{ left: isMobile ? 40 : 80, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
                   <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 12 }} />

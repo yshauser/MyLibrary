@@ -18,6 +18,13 @@ import {
   MenuItem,
   Select,
   Button,
+  Card,
+  CardContent,
+  CardActions,
+  Divider,
+  Stack,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -55,6 +62,8 @@ const todayISO = () => new Date().toISOString().split('T')[0];
 
 export default function ActivityLogPage() {
   const { isAdmin, user } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [entries, setEntries] = useState<ActivityLogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [editId, setEditId] = useState<string | null>(null);
@@ -156,6 +165,141 @@ export default function ActivityLogPage() {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
         <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (isMobile) {
+    return (
+      <Box>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+          <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            יומן פעילות
+          </Typography>
+          {isAdmin && !adding && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<AddIcon />}
+              onClick={() => {
+                setAdding(true);
+                setAddForm({ actionType: 'add', actionDate: todayISO(), bookTitle: '', loanerName: '', performedBy: user?.email ?? '' });
+              }}
+            >
+              הוסף
+            </Button>
+          )}
+        </Box>
+
+        {isAdmin && adding && (
+          <Card variant="outlined" sx={{ mb: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
+            <CardContent>
+              <Stack spacing={1.5}>
+                <TextField size="small" fullWidth type="date" label="תאריך"
+                  value={addForm.actionDate}
+                  onChange={(e) => setAddForm((f) => ({ ...f, actionDate: e.target.value }))}
+                  slotProps={{ inputLabel: { shrink: true }, htmlInput: { lang: 'en-GB' } }}
+                />
+                <Select size="small" fullWidth value={addForm.actionType}
+                  onChange={(e) => setAddForm((f) => ({ ...f, actionType: e.target.value as ActivityType }))}>
+                  {(Object.entries(ACTIVITY_TYPE_LABELS) as [ActivityType, string][]).map(([key, label]) => (
+                    <MenuItem key={key} value={key}>{label}</MenuItem>
+                  ))}
+                </Select>
+                <TextField size="small" fullWidth label="שם הספר *" value={addForm.bookTitle}
+                  onChange={(e) => setAddForm((f) => ({ ...f, bookTitle: e.target.value }))} />
+                <TextField size="small" fullWidth label="שם השואל" value={addForm.loanerName}
+                  onChange={(e) => setAddForm((f) => ({ ...f, loanerName: e.target.value }))} />
+              </Stack>
+            </CardContent>
+            <CardActions sx={{ justifyContent: 'flex-end' }}>
+              <Button onClick={() => setAdding(false)}>ביטול</Button>
+              <Button variant="contained" onClick={handleAddSave}
+                disabled={saving || !addForm.bookTitle.trim()}>שמור</Button>
+            </CardActions>
+          </Card>
+        )}
+
+        {sortedEntries.length === 0 && (
+          <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+            אין פעילות מתועדת
+          </Typography>
+        )}
+
+        {sortedEntries.map((entry) => (
+          <Card key={entry.id} variant="outlined" sx={{ mb: 1.5, borderRadius: 2 }}>
+            {editId === entry.id ? (
+              <CardContent>
+                <Stack spacing={1.5}>
+                  <TextField size="small" fullWidth type="date" label="תאריך"
+                    value={editForm.actionDate}
+                    onChange={(e) => setEditForm((f) => ({ ...f, actionDate: e.target.value }))}
+                    slotProps={{ inputLabel: { shrink: true }, htmlInput: { lang: 'en-GB' } }}
+                  />
+                  <Select size="small" fullWidth value={editForm.actionType}
+                    onChange={(e) => setEditForm((f) => ({ ...f, actionType: e.target.value as ActivityType }))}>
+                    {(Object.entries(ACTIVITY_TYPE_LABELS) as [ActivityType, string][]).map(([key, label]) => (
+                      <MenuItem key={key} value={key}>{label}</MenuItem>
+                    ))}
+                  </Select>
+                  <TextField size="small" fullWidth label="שם הספר" value={editForm.bookTitle}
+                    onChange={(e) => setEditForm((f) => ({ ...f, bookTitle: e.target.value }))} />
+                  <TextField size="small" fullWidth label="שם השואל" value={editForm.loanerName}
+                    onChange={(e) => setEditForm((f) => ({ ...f, loanerName: e.target.value }))} />
+                </Stack>
+                <Box sx={{ display: 'flex', gap: 1, mt: 1.5 }}>
+                  <Button variant="contained" size="small" startIcon={<SaveIcon />}
+                    onClick={handleSave} disabled={saving}>שמור</Button>
+                  <Button variant="outlined" size="small" startIcon={<CancelIcon />}
+                    onClick={() => setEditId(null)}>ביטול</Button>
+                </Box>
+              </CardContent>
+            ) : (
+              <>
+                <CardContent sx={{ pb: '8px !important' }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                    <Chip
+                      label={ACTIVITY_TYPE_LABELS[entry.actionType] ?? entry.actionType}
+                      size="small"
+                      color={ACTION_COLORS[entry.actionType] ?? 'default'}
+                      variant="outlined"
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                      {entry.actionDate?.toDate?.().toLocaleDateString('he-IL') ?? ''}
+                    </Typography>
+                  </Box>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{entry.bookTitle}</Typography>
+                  {entry.loanerName && (
+                    <Typography variant="body2" color="text.secondary">שואל: {entry.loanerName}</Typography>
+                  )}
+                  <Typography variant="caption" color="text.secondary">{entry.performedBy}</Typography>
+                </CardContent>
+                {isAdmin && (
+                  <>
+                    <Divider />
+                    <CardActions sx={{ justifyContent: 'flex-end', py: 0.5 }}>
+                      <Tooltip title="עריכה">
+                        <IconButton onClick={() => startEdit(entry)}>
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="מחיקה">
+                        <IconButton color="error" onClick={async () => {
+                          if (window.confirm('למחוק רשומה זו?')) {
+                            await activityLogService.deleteEntry(entry.id);
+                            load();
+                          }
+                        }}>
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
+                    </CardActions>
+                  </>
+                )}
+              </>
+            )}
+          </Card>
+        ))}
       </Box>
     );
   }

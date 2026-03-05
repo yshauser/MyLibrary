@@ -22,6 +22,8 @@ import {
   Typography,
   InputAdornment,
   Stack,
+  Badge,
+  Button,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
@@ -34,12 +36,14 @@ import {
   KeyboardArrowUp,
   MenuBook as LoanIcon,
   Clear as ClearIcon,
+  FilterList as FilterIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import type { Book, ReadingStatus } from '../../types/book';
 import { useAuth } from '../../contexts/AuthContext';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 import BookExpandedRow from './BookExpandedRow';
+import BookCardList from './BookCardList';
 
 interface BookTableProps {
   books: Book[];
@@ -89,6 +93,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const handleSort = (field: SortableField) => {
     const isAsc = orderBy === field && order === 'asc';
@@ -164,94 +169,120 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     setPage(0);
   };
 
+  const activeFilterCount = [genreFilter, subGenreFilter, statusFilter, loanFilter].filter(Boolean).length;
   const hasActiveFilters = searchQuery || genreFilter || subGenreFilter || statusFilter || loanFilter;
+
+  const filterDropdowns = (
+    <Stack direction={isMobile ? 'column' : 'row'} spacing={2} flexWrap="wrap" useFlexGap>
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>ז׳אנר</InputLabel>
+        <Select
+          value={genreFilter}
+          label="ז׳אנר"
+          onChange={(e: SelectChangeEvent) => { setGenreFilter(e.target.value); setPage(0); }}
+        >
+          <MenuItem value="">הכל</MenuItem>
+          {GENRES.map((g) => (
+            <MenuItem key={g} value={g}>{g}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>תת-ז׳אנר</InputLabel>
+        <Select
+          value={subGenreFilter}
+          label="תת-ז׳אנר"
+          onChange={(e: SelectChangeEvent) => { setSubGenreFilter(e.target.value); setPage(0); }}
+        >
+          <MenuItem value="">הכל</MenuItem>
+          {SUB_GENRES.map((g) => (
+            <MenuItem key={g} value={g}>{g}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>סטטוס קריאה</InputLabel>
+        <Select
+          value={statusFilter}
+          label="סטטוס קריאה"
+          onChange={(e: SelectChangeEvent) => { setStatusFilter(e.target.value); setPage(0); }}
+        >
+          <MenuItem value="">הכל</MenuItem>
+          {Object.entries(READING_STATUSES).map(([key, label]) => (
+            <MenuItem key={key} value={key}>{label}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>השאלה</InputLabel>
+        <Select
+          value={loanFilter}
+          label="השאלה"
+          onChange={(e: SelectChangeEvent) => { setLoanFilter(e.target.value); setPage(0); }}
+        >
+          <MenuItem value="">הכל</MenuItem>
+          <MenuItem value="loaned">מושאל</MenuItem>
+          <MenuItem value="available">זמין</MenuItem>
+        </Select>
+      </FormControl>
+      {hasActiveFilters && (
+        <Tooltip title="נקה סינונים">
+          <IconButton onClick={clearFilters} size="small" color="secondary">
+            <ClearIcon />
+          </IconButton>
+        </Tooltip>
+      )}
+    </Stack>
+  );
 
   return (
     <Box>
       {/* Search and Filters */}
       <Paper sx={{ p: 2, mb: 2 }}>
         <Stack spacing={2}>
-          <TextField
-            fullWidth
-            placeholder="חיפוש לפי שם ספר, מחבר, ISBN, מספר מזהה, סדרה..."
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchIcon />
-                </InputAdornment>
-              ),
-              endAdornment: searchQuery ? (
-                <InputAdornment position="end">
-                  <IconButton size="small" onClick={() => setSearchQuery('')}>
-                    <ClearIcon />
-                  </IconButton>
-                </InputAdornment>
-              ) : null,
-            }}
-            size="small"
-          />
-          <Stack direction="row" spacing={2} flexWrap="wrap" useFlexGap>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>ז׳אנר</InputLabel>
-              <Select
-                value={genreFilter}
-                label="ז׳אנר"
-                onChange={(e: SelectChangeEvent) => { setGenreFilter(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="">הכל</MenuItem>
-                {GENRES.map((g) => (
-                  <MenuItem key={g} value={g}>{g}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>תת-ז׳אנר</InputLabel>
-              <Select
-                value={subGenreFilter}
-                label="תת-ז׳אנר"
-                onChange={(e: SelectChangeEvent) => { setSubGenreFilter(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="">הכל</MenuItem>
-                {SUB_GENRES.map((g) => (
-                  <MenuItem key={g} value={g}>{g}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>סטטוס קריאה</InputLabel>
-              <Select
-                value={statusFilter}
-                label="סטטוס קריאה"
-                onChange={(e: SelectChangeEvent) => { setStatusFilter(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="">הכל</MenuItem>
-                {Object.entries(READING_STATUSES).map(([key, label]) => (
-                  <MenuItem key={key} value={key}>{label}</MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <FormControl size="small" sx={{ minWidth: 140 }}>
-              <InputLabel>השאלה</InputLabel>
-              <Select
-                value={loanFilter}
-                label="השאלה"
-                onChange={(e: SelectChangeEvent) => { setLoanFilter(e.target.value); setPage(0); }}
-              >
-                <MenuItem value="">הכל</MenuItem>
-                <MenuItem value="loaned">מושאל</MenuItem>
-                <MenuItem value="available">זמין</MenuItem>
-              </Select>
-            </FormControl>
-            {hasActiveFilters && (
-              <Tooltip title="נקה סינונים">
-                <IconButton onClick={clearFilters} size="small" color="secondary">
-                  <ClearIcon />
-                </IconButton>
-              </Tooltip>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <TextField
+              fullWidth
+              placeholder="חיפוש לפי שם ספר, מחבר, ISBN, מספר מזהה, סדרה..."
+              value={searchQuery}
+              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery ? (
+                  <InputAdornment position="end">
+                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                      <ClearIcon />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+              size="small"
+            />
+            {isMobile && (
+              <Badge badgeContent={activeFilterCount} color="secondary">
+                <Button
+                  variant={filtersOpen ? 'contained' : 'outlined'}
+                  size="small"
+                  onClick={() => setFiltersOpen((v) => !v)}
+                  startIcon={<FilterIcon />}
+                  sx={{ whiteSpace: 'nowrap', minWidth: 'fit-content' }}
+                >
+                  סינון
+                </Button>
+              </Badge>
             )}
           </Stack>
+          {isMobile ? (
+            <Collapse in={filtersOpen}>
+              {filterDropdowns}
+            </Collapse>
+          ) : (
+            filterDropdowns
+          )}
           <Typography variant="body2" color="text.secondary">
             {filteredAndSortedBooks.length} ספרים
             {hasActiveFilters ? ` (מסונן מתוך ${books.length})` : ''}
@@ -259,8 +290,33 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         </Stack>
       </Paper>
 
-      {/* Table */}
-      <TableContainer component={Paper}>
+      {/* Mobile card view */}
+      {isMobile && (
+        <BookCardList
+          books={paginatedBooks}
+          onDelete={onDelete}
+          onLoan={onLoan}
+        />
+      )}
+      {isMobile && (
+        <TablePagination
+          component="div"
+          count={filteredAndSortedBooks.length}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50]}
+          labelRowsPerPage=""
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} מתוך ${count}`}
+        />
+      )}
+
+      {/* Desktop table */}
+      {!isMobile && <TableContainer component={Paper}>
         <Table size={isMobile ? 'small' : 'medium'}>
           <TableHead>
             <TableRow sx={{ bgcolor: 'primary.main' }}>
@@ -437,7 +493,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           labelRowsPerPage="שורות בעמוד:"
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} מתוך ${count}`}
         />
-      </TableContainer>
+      </TableContainer>}
     </Box>
   );
 }
