@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Box,
   Typography,
@@ -5,9 +6,13 @@ import {
   Chip,
   Rating,
   Divider,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import { SwapHoriz as SwapHorizIcon } from '@mui/icons-material';
 import type { Book } from '../../types/book';
 import { READING_STATUSES } from '../../config/constants';
+import { toShortDanacode } from '../../utils/danacode';
 
 interface BookExpandedRowProps {
   book: Book;
@@ -28,6 +33,8 @@ function InfoField({ label, value }: { label: string; value?: string | number | 
 }
 
 export default function BookExpandedRow({ book }: BookExpandedRowProps) {
+  const [danacodeShort, setDanacodeShort] = useState(true);
+
   return (
     <Box sx={{ py: 2, px: 1 }}>
       <Grid container spacing={3}>
@@ -38,6 +45,21 @@ export default function BookExpandedRow({ book }: BookExpandedRowProps) {
           </Typography>
           <InfoField label="מספר מזהה" value={book.internalId} />
           <InfoField label="ISBN" value={book.isbn} />
+          {book.danacode && (
+            <Box sx={{ mb: 1 }}>
+              <Typography variant="caption" color="text.secondary" component="span">
+                דאנאקוד:{' '}
+              </Typography>
+              <Typography variant="body2" component="span">
+                {danacodeShort ? toShortDanacode(book.danacode) : book.danacode}
+              </Typography>
+              <Tooltip title={danacodeShort ? 'הצג פורמט ארוך' : 'הצג פורמט קצר'}>
+                <IconButton size="small" onClick={() => setDanacodeShort((v) => !v)} sx={{ p: 0.25, ml: 0.5 }}>
+                  <SwapHorizIcon fontSize="inherit" />
+                </IconButton>
+              </Tooltip>
+            </Box>
+          )}
           <InfoField label="שנת הוצאה" value={book.publishedYear} />
           <InfoField label="הוצאה לאור" value={book.publishingHouse} />
           <InfoField label="מהדורה" value={book.edition} />

@@ -15,7 +15,11 @@ import { CameraAlt as CameraIcon } from '@mui/icons-material';
 interface IsbnScannerProps {
   open: boolean;
   onClose: () => void;
-  onScan: (isbn: string) => void;
+  onScan: (value: string) => void;
+  title?: string;
+  hint?: string;
+  noResultMessage?: string;
+  extract?: (text: string) => string | null;
 }
 
 const VISION_API_URL = 'https://vision.googleapis.com/v1/images:annotate';
@@ -43,7 +47,15 @@ function extractIsbn(text: string): string | null {
   return null;
 }
 
-export default function IsbnScanner({ open, onClose, onScan }: IsbnScannerProps) {
+export default function IsbnScanner({
+  open,
+  onClose,
+  onScan,
+  title = 'סריקת ISBN מהמצלמה',
+  hint = 'כוון את המצלמה לאזור ה-ISBN ולחץ "צלם"',
+  noResultMessage = 'לא זוהה מספר ISBN — נסה שוב, וודא שהמספרים נראים בבירור',
+  extract = extractIsbn,
+}: IsbnScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -138,12 +150,12 @@ export default function IsbnScanner({ open, onClose, onScan }: IsbnScannerProps)
         data.responses?.[0]?.fullTextAnnotation?.text ?? '';
       console.log('OCR raw text:', fullText);
 
-      const isbn = extractIsbn(fullText);
-      if (isbn) {
-        onScan(isbn);
+      const result = extract(fullText);
+      if (result) {
+        onScan(result);
         onClose();
       } else {
-        setRetryMsg('לא זוהה מספר ISBN — נסה שוב, וודא שהמספרים נראים בבירור');
+        setRetryMsg(noResultMessage);
       }
     } catch (e) {
       console.error(e);
@@ -155,7 +167,7 @@ export default function IsbnScanner({ open, onClose, onScan }: IsbnScannerProps)
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>סריקת ISBN מהמצלמה</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, alignItems: 'center' }}>
           {error ? (
@@ -195,7 +207,7 @@ export default function IsbnScanner({ open, onClose, onScan }: IsbnScannerProps)
                 </Typography>
               )}
               <Typography variant="body2" color="text.secondary" textAlign="center">
-                כוון את המצלמה לאזור ה-ISBN ולחץ "צלם"
+                {hint}
               </Typography>
             </>
           )}

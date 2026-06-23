@@ -37,6 +37,7 @@ export interface Book {
   language?: string;
   originalLanguage?: string;
   isbn?: string;
+  danacode?: string;
   publishedYear?: number;
   translatedBy?: string;
   translationPublishingYear?: number;

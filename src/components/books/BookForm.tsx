@@ -38,6 +38,7 @@ import {
 import IsbnScanner from './IsbnScanner';
 import { fetchBookByIsbn } from '../../services/googleBooksService';
 import { fetchBookFromNli } from '../../services/nliService';
+import { toLongDanacode, toShortDanacode, extractDanacode } from '../../utils/danacode';
 import type { Book, BookFormData, Author, Series } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 
@@ -61,6 +62,12 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
   const [language, setLanguage] = useState(initialData?.language || 'עברית');
   const [originalLanguage, setOriginalLanguage] = useState(initialData?.originalLanguage || '');
   const [isbn, setIsbn] = useState(initialData?.isbn || '');
+  const [danacode, setDanacode] = useState(
+    initialData?.danacode ? toShortDanacode(initialData.danacode) : ''
+  );
+  const [danacodeError, setDanacodeError] = useState('');
+  const [lookingUpDana, setLookingUpDana] = useState(false);
+  const [danaScannerOpen, setDanaScannerOpen] = useState(false);
   const [publishedYear, setPublishedYear] = useState<string>(
     initialData?.publishedYear?.toString() || ''
   );
@@ -86,9 +93,30 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
   const [genreOpen, setGenreOpen] = useState(false);
   const [subGenreOpen, setSubGenreOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
-  const [additionalExpanded, setAdditionalExpanded] = useState(!!initialData?.isbn);
+  const [additionalExpanded, setAdditionalExpanded] = useState(!!(initialData?.isbn || initialData?.danacode));
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState('');
+
+  const applyLookupData = (data: Awaited<ReturnType<typeof fetchBookByIsbn>>) => {
+    if (!data) return;
+    if (data.title && !title) setTitle(data.title);
+    if (data.originalTitle && !originalTitle) setOriginalTitle(data.originalTitle);
+    if (data.authors?.length && (!authors.length || (authors.length === 1 && !authors[0].firstName && !authors[0].lastName))) {
+      setAuthors(data.authors.map((name) => {
+        const parts = name.trim().split(' ');
+        const lastName = parts.pop() || '';
+        const firstName = parts.join(' ');
+        return { firstName, lastName };
+      }));
+    }
+    if (data.translatedBy && !translatedBy) setTranslatedBy(data.translatedBy);
+    if (data.publishingHouse && !publishingHouse) setPublishingHouse(data.publishingHouse);
+    if (data.publishedYear && !publishedYear) setPublishedYear(String(data.publishedYear));
+    if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
+    if (data.language && !language) setLanguage(data.language);
+    if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
+    setAdditionalExpanded(true);
+  };
 
   const handleGoogleBooksLookup = async () => {
     if (!isbn) return;
@@ -108,27 +136,41 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
         return;
       }
 
-      if (data.title && !title) setTitle(data.title);
-      if (data.originalTitle && !originalTitle) setOriginalTitle(data.originalTitle);
-      if (data.authors?.length && (!authors.length || (authors.length === 1 && !authors[0].firstName && !authors[0].lastName))) {
-        setAuthors(data.authors.map((name) => {
-          const parts = name.trim().split(' ');
-          const lastName = parts.pop() || '';
-          const firstName = parts.join(' ');
-          return { firstName, lastName };
-        }));
-      }
-      if (data.translatedBy && !translatedBy) setTranslatedBy(data.translatedBy);
-      if (data.publishingHouse && !publishingHouse) setPublishingHouse(data.publishingHouse);
-      if (data.publishedYear && !publishedYear) setPublishedYear(String(data.publishedYear));
-      if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
-      if (data.language && !language) setLanguage(data.language);
-      if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
-      setAdditionalExpanded(true);
+      applyLookupData(data);
     } catch {
       setLookupError('שגיאה בחיפוש פרטי הספר');
     } finally {
       setLookingUp(false);
+    }
+  };
+
+  const handleDanacodeLookup = async () => {
+    if (!danacode) return;
+    setLookingUpDana(true);
+    setDanacodeError('');
+    try {
+      const long = toLongDanacode(danacode);
+      if (!long) {
+        setDanacodeError('פורמט דאנאקוד לא תקין');
+        return;
+      }
+
+      let data = await fetchBookFromNli(long);
+      if (!data) {
+        console.log('NLI returned no results for danacode, falling back to Google Books');
+        data = await fetchBookByIsbn(long);
+      }
+
+      if (!data) {
+        setDanacodeError('לא נמצא ספר עם דאנאקוד זה');
+        return;
+      }
+
+      applyLookupData(data);
+    } catch {
+      setDanacodeError('שגיאה בחיפוש פרטי הספר');
+    } finally {
+      setLookingUpDana(false);
     }
   };
 
@@ -185,6 +227,10 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
     if (language) bookData.language = language;
     if (originalLanguage) bookData.originalLanguage = originalLanguage;
     if (isbn) bookData.isbn = isbn;
+    if (danacode) {
+      const longCode = toLongDanacode(danacode);
+      if (longCode) bookData.danacode = longCode;
+    }
     if (publishedYear) bookData.publishedYear = parseInt(publishedYear);
     if (translatedBy) bookData.translatedBy = translatedBy;
     if (translationPublishingYear) bookData.translationPublishingYear = parseInt(translationPublishingYear);
@@ -389,6 +435,44 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
                     </Tooltip>
                   </Box>
                 </Grid>
+                <Grid size={{ xs: 12, sm: 4 }}>
+                  <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                    <TextField
+                      fullWidth
+                      label="דאנאקוד"
+                      value={danacode}
+                      onChange={(e) => { setDanacode(e.target.value); setDanacodeError(''); }}
+                      error={!!danacodeError}
+                      helperText={danacodeError || 'פורמט: PPPP-IIIIIII או 12 ספרות'}
+                      placeholder="לדוג׳: 1234-5678901"
+                      slotProps={{
+                        input: {
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <Tooltip title="סרוק דאנאקוד מהמצלמה">
+                                <IconButton size="small" onClick={() => setDanaScannerOpen(true)} edge="end">
+                                  <CameraAltIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </InputAdornment>
+                          ),
+                        },
+                      }}
+                    />
+                    <Tooltip title="חפש פרטי ספר לפי דאנאקוד">
+                      <span>
+                        <IconButton
+                          onClick={handleDanacodeLookup}
+                          disabled={!danacode || lookingUpDana}
+                          color="primary"
+                          sx={{ mt: 1 }}
+                        >
+                          {lookingUpDana ? <CircularProgress size={20} /> : <SearchIcon />}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
+                </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="שנת הוצאה" type="number" value={publishedYear} onChange={(e) => setPublishedYear(e.target.value)} />
                 </Grid>
@@ -540,6 +624,20 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
           setAdditionalExpanded(true);
           setScannerOpen(false);
         }}
+      />
+      <IsbnScanner
+        open={danaScannerOpen}
+        onClose={() => setDanaScannerOpen(false)}
+        onScan={(scanned) => {
+          setDanacode(scanned);
+          setDanacodeError('');
+          setAdditionalExpanded(true);
+          setDanaScannerOpen(false);
+        }}
+        title="סריקת דאנאקוד מהמצלמה"
+        hint='כוון את המצלמה לאזור הדאנאקוד ולחץ "צלם"'
+        noResultMessage="לא זוהה דאנאקוד — נסה שוב, וודא שהמספרים נראים בבירור"
+        extract={extractDanacode}
       />
     </Paper>
   );
