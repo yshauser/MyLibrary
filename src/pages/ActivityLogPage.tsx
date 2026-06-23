@@ -25,6 +25,9 @@ import {
   Stack,
   useMediaQuery,
   useTheme,
+  FormControl,
+  InputLabel,
+  InputAdornment,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -32,6 +35,7 @@ import {
   Close as CancelIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { Timestamp } from 'firebase/firestore';
 import { activityLogService } from '../services/activityLogService';
@@ -73,6 +77,8 @@ export default function ActivityLogPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [adding, setAdding] = useState(false);
   const [addForm, setAddForm] = useState<EditForm>({ actionType: 'add', actionDate: todayISO(), bookTitle: '', loanerName: '', performedBy: user?.email ?? '' });
+  const [filterType, setFilterType] = useState<ActivityType | 'all'>('all');
+  const [searchText, setSearchText] = useState('');
 
   const handleSort = (key: LogSortKey) => {
     if (sortKey === key) {
@@ -99,6 +105,21 @@ export default function ActivityLogPage() {
       return 0;
     });
   }, [entries, sortKey, sortOrder]);
+
+  const filteredEntries = useMemo(() => {
+    const lc = searchText.toLowerCase();
+    return sortedEntries.filter((entry) => {
+      if (filterType !== 'all' && entry.actionType !== filterType) return false;
+      if (lc) {
+        return (
+          entry.bookTitle.toLowerCase().includes(lc) ||
+          (entry.loanerName ?? '').toLowerCase().includes(lc) ||
+          entry.performedBy.toLowerCase().includes(lc)
+        );
+      }
+      return true;
+    });
+  }, [sortedEntries, filterType, searchText]);
 
   const load = () => {
     activityLogService.getActivityLog()
@@ -191,6 +212,30 @@ export default function ActivityLogPage() {
           )}
         </Box>
 
+        <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+          <TextField
+            size="small"
+            placeholder="חיפוש..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            sx={{ flex: 1 }}
+            InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+          />
+          <FormControl size="small" sx={{ minWidth: 120 }}>
+            <InputLabel>סוג פעולה</InputLabel>
+            <Select
+              value={filterType}
+              label="סוג פעולה"
+              onChange={(e) => setFilterType(e.target.value as ActivityType | 'all')}
+            >
+              <MenuItem value="all">הכל</MenuItem>
+              {(Object.entries(ACTIVITY_TYPE_LABELS) as [ActivityType, string][]).map(([key, label]) => (
+                <MenuItem key={key} value={key}>{label}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+
         {isAdmin && adding && (
           <Card variant="outlined" sx={{ mb: 2, borderRadius: 2, bgcolor: 'action.hover' }}>
             <CardContent>
@@ -220,13 +265,13 @@ export default function ActivityLogPage() {
           </Card>
         )}
 
-        {sortedEntries.length === 0 && (
+        {filteredEntries.length === 0 && (
           <Typography color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
             אין פעילות מתועדת
           </Typography>
         )}
 
-        {sortedEntries.map((entry) => (
+        {filteredEntries.map((entry) => (
           <Card key={entry.id} variant="outlined" sx={{ mb: 1.5, borderRadius: 2 }}>
             {editId === entry.id ? (
               <CardContent>
@@ -324,6 +369,30 @@ export default function ActivityLogPage() {
           </Button>
         )}
       </Box>
+
+      <Stack direction="row" spacing={1.5} sx={{ mb: 2 }}>
+        <TextField
+          size="small"
+          placeholder="חיפוש..."
+          value={searchText}
+          onChange={(e) => setSearchText(e.target.value)}
+          sx={{ flex: 1, maxWidth: 320 }}
+          InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
+        />
+        <FormControl size="small" sx={{ minWidth: 140 }}>
+          <InputLabel>סוג פעולה</InputLabel>
+          <Select
+            value={filterType}
+            label="סוג פעולה"
+            onChange={(e) => setFilterType(e.target.value as ActivityType | 'all')}
+          >
+            <MenuItem value="all">הכל</MenuItem>
+            {(Object.entries(ACTIVITY_TYPE_LABELS) as [ActivityType, string][]).map(([key, label]) => (
+              <MenuItem key={key} value={key}>{label}</MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Stack>
 
       {entries.length === 0 ? (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
@@ -431,7 +500,7 @@ export default function ActivityLogPage() {
                 </TableRow>
               )}
 
-              {sortedEntries.map((entry) => (
+              {filteredEntries.map((entry) => (
                 <TableRow key={entry.id} hover>
                   {editId === entry.id ? (
                     <>

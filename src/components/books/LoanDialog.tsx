@@ -20,6 +20,10 @@ import {
   Chip,
   CircularProgress,
 } from '@mui/material';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { enGB } from 'date-fns/locale';
 import type { Book, LoanRecord } from '../../types/book';
 import { loanService } from '../../services/loanService';
 import { auth } from '../../config/firebase';
@@ -34,8 +38,8 @@ interface LoanDialogProps {
 export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanDialogProps) {
   const [tab, setTab] = useState(0);
   const [loanerName, setLoanerName] = useState('');
-  const [loanDate, setLoanDate] = useState(new Date().toISOString().split('T')[0]);
-  const [returnDate, setReturnDate] = useState(new Date().toISOString().split('T')[0]);
+  const [loanDate, setLoanDate] = useState<Date | null>(new Date());
+  const [returnDate, setReturnDate] = useState<Date | null>(new Date());
   const [loanHistory, setLoanHistory] = useState<LoanRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -68,7 +72,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
     if (!book || !loanerName) return;
     setLoading(true);
     try {
-      await loanService.loanBook(book.id, loanerName, new Date(loanDate), book.title, auth.currentUser?.email ?? undefined);
+      await loanService.loanBook(book.id, loanerName, loanDate ?? undefined, book.title, auth.currentUser?.email ?? undefined);
       setLoanerName('');
       onLoanUpdated();
       onClose();
@@ -85,7 +89,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
     if (!activeLoan) return;
     setLoading(true);
     try {
-      await loanService.returnBook(book.id, activeLoan.id, new Date(returnDate), book.title, book.currentLoan?.loanerName, auth.currentUser?.email ?? undefined);
+      await loanService.returnBook(book.id, activeLoan.id, returnDate ?? undefined, book.title, book.currentLoan?.loanerName, auth.currentUser?.email ?? undefined);
       onLoanUpdated();
       onClose();
     } catch (error) {
@@ -108,6 +112,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
         )}
       </DialogTitle>
       <DialogContent>
+        <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={enGB}>
         <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
           <Tab label={isLoaned ? 'החזרה' : 'השאלה'} />
           <Tab label="היסטוריית השאלות" />
@@ -121,14 +126,13 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
                   הספר מושאל ל<strong>{book.currentLoan!.loanerName}</strong> מתאריך{' '}
                   {book.currentLoan!.loanDate?.toDate?.().toLocaleDateString('he-IL') ?? ''}
                 </Typography>
-                <TextField
-                  fullWidth
+                <DatePicker
                   label="תאריך החזרה"
-                  type="date"
                   value={returnDate}
-                  onChange={(e) => setReturnDate(e.target.value)}
-                  sx={{ mt: 2 }}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setReturnDate}
+                  format="dd/MM/yyyy"
+                  maxDate={new Date()}
+                  slotProps={{ textField: { fullWidth: true, sx: { mt: 2 } } }}
                 />
               </>
             ) : (
@@ -140,13 +144,13 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
                   onChange={(e) => setLoanerName(e.target.value)}
                   sx={{ mb: 2 }}
                 />
-                <TextField
-                  fullWidth
+                <DatePicker
                   label="תאריך השאלה"
-                  type="date"
                   value={loanDate}
-                  onChange={(e) => setLoanDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
+                  onChange={setLoanDate}
+                  format="dd/MM/yyyy"
+                  maxDate={new Date()}
+                  slotProps={{ textField: { fullWidth: true } }}
                 />
               </>
             )}
@@ -199,6 +203,7 @@ export default function LoanDialog({ book, open, onClose, onLoanUpdated }: LoanD
             )}
           </Box>
         )}
+        </LocalizationProvider>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose}>סגור</Button>
