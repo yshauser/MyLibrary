@@ -39,7 +39,7 @@ interface ParsedRow {
   numberOfPages?: number;
   seriesName?: string;
   volumeNumber?: number;
-  volumePart?: number;
+  volumePart?: string;
   totalVolumes?: number;
   hasUntranslatedBooks?: boolean;
   comments?: string;
@@ -88,7 +88,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
   const translationPublishingYear = row['שנת תרגום'] ? Number(row['שנת תרגום']) : undefined;
   const numberOfPages = row['מספר עמודים'] ? Number(row['מספר עמודים']) : undefined;
   const volumeNumber = row['מספר כרך'] ? Number(row['מספר כרך']) : undefined;
-  const volumePart = row['חלק בכרך'] ? Number(row['חלק בכרך']) : undefined;
+  const volumePart = String(row['חלק בכרך'] || '').trim() || undefined;
   const totalVolumes = row['סה״כ כרכים'] ? Number(row['סה״כ כרכים']) : undefined;
   const personalRating = row['דירוג'] ? Number(row['דירוג']) : undefined;
 
@@ -110,7 +110,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     numberOfPages: numberOfPages && !isNaN(numberOfPages) ? numberOfPages : undefined,
     seriesName: String(row['שם סדרה'] || '').trim() || undefined,
     volumeNumber: volumeNumber && !isNaN(volumeNumber) ? volumeNumber : undefined,
-    volumePart: volumePart && !isNaN(volumePart) ? volumePart : undefined,
+    volumePart,
     totalVolumes: totalVolumes && !isNaN(totalVolumes) ? totalVolumes : undefined,
     hasUntranslatedBooks: String(row['כרכים לא מתורגמים'] || '').trim() === 'כן',
     comments: String(row['הערות'] || '').trim() || undefined,

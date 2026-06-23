@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/material';
-import type { BookFormData } from '../types/book';
+import type { BookFormData, Series } from '../types/book';
 import { bookService } from '../services/bookService';
 import BookForm from '../components/books/BookForm';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,6 +12,7 @@ export default function AddBookPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [nextId, setNextId] = useState<string | null>(null);
+  const [existingSeries, setExistingSeries] = useState<Series[]>([]);
 
   useEffect(() => {
     bookService.getAllBooks().then((books) => {
@@ -20,6 +21,7 @@ export default function AddBookPage() {
         return isNaN(n) ? max : Math.max(max, n);
       }, 0);
       setNextId(String(maxId + 1));
+      setExistingSeries(books.flatMap((b) => (b.series ? [b.series] : [])));
     }).catch(() => setNextId('1'));
   }, []);
 
@@ -52,6 +54,7 @@ export default function AddBookPage() {
           onSubmit={handleSubmit}
           onCancel={() => navigate('/')}
           isLoading={loading}
+          existingSeries={existingSeries}
         />
       )}
       <Snackbar

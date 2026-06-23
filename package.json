@@ -1,7 +1,7 @@
 {
   "name": "mylibrary",
   "private": true,
-  "version": "1.4.01",
+  "version": "1.4.02",
   "type": "module",
   "scripts": {
     "dev": "vite",

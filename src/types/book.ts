@@ -8,7 +8,7 @@ export interface Author {
 export interface Series {
   name: string;
   volumeNumber?: number;
-  volumePart?: number;
+  volumePart?: string;
   totalVolumes?: number;
   hasUntranslatedBooks?: boolean;
 }

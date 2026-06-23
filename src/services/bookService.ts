@@ -37,6 +37,21 @@ function removeUndefined(obj: Record<string, unknown>): Record<string, unknown> 
   return clean;
 }
 
+async function syncSeriesTotalVolumes(seriesName: string, totalVolumes: number, excludeId?: string): Promise<void> {
+  const snapshot = await getDocs(booksRef);
+  const batch = writeBatch(db);
+  let count = 0;
+  for (const docSnap of snapshot.docs) {
+    if (docSnap.id === excludeId) continue;
+    const data = docSnap.data();
+    if (data.series?.name === seriesName && data.series?.totalVolumes !== totalVolumes) {
+      batch.update(docSnap.ref, { 'series.totalVolumes': totalVolumes });
+      count++;
+    }
+  }
+  if (count > 0) await batch.commit();
+}
+
 export const bookService = {
   async getBooks(
     pageSize: number = BOOKS_PER_PAGE,
@@ -106,6 +121,9 @@ export const bookService = {
     if (performedBy) {
       activityLogService.logAction('add', bookData.title, docRef.id, performedBy).catch(() => {});
     }
+    if (bookData.series?.name && bookData.series?.totalVolumes != null) {
+      syncSeriesTotalVolumes(bookData.series.name, bookData.series.totalVolumes, docRef.id).catch(() => {});
+    }
     return docRef.id;
   },
 
@@ -114,6 +132,9 @@ export const bookService = {
     await updateDoc(docRef, removeUndefined(bookData as Record<string, unknown>));
     if (performedBy && bookData.title) {
       activityLogService.logAction('edit', bookData.title, id, performedBy).catch(() => {});
+    }
+    if (bookData.series?.name && bookData.series?.totalVolumes != null) {
+      syncSeriesTotalVolumes(bookData.series.name, bookData.series.totalVolumes, id).catch(() => {});
     }
   },
 

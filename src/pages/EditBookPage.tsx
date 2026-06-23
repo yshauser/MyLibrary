@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/material';
-import type { Book, BookFormData } from '../types/book';
+import type { Book, BookFormData, Series } from '../types/book';
 import { bookService } from '../services/bookService';
 import BookForm from '../components/books/BookForm';
 import { useAuth } from '../contexts/AuthContext';
@@ -14,13 +14,18 @@ export default function EditBookPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [existingSeries, setExistingSeries] = useState<Series[]>([]);
 
   useEffect(() => {
     const loadBook = async () => {
       if (!id) return;
       try {
-        const bookData = await bookService.getBookById(id);
+        const [bookData, allBooks] = await Promise.all([
+          bookService.getBookById(id),
+          bookService.getAllBooks(),
+        ]);
         setBook(bookData);
+        setExistingSeries(allBooks.flatMap((b) => (b.series ? [b.series] : [])));
       } catch (err) {
         console.error('Error loading book:', err);
         setError('שגיאה בטעינת הספר');
@@ -77,6 +82,7 @@ export default function EditBookPage() {
         onSubmit={handleSubmit}
         onCancel={() => navigate('/')}
         isLoading={saving}
+        existingSeries={existingSeries}
       />
       <Snackbar
         open={!!error}

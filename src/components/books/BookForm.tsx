@@ -23,7 +23,9 @@ import {
   InputAdornment,
   Tooltip,
   CircularProgress,
+  Divider,
 } from '@mui/material';
+import Autocomplete from '@mui/material/Autocomplete';
 import type { SelectChangeEvent } from '@mui/material';
 import {
   Add as AddIcon,
@@ -31,11 +33,12 @@ import {
   ExpandMore as ExpandMoreIcon,
   CameraAlt as CameraAltIcon,
   Search as SearchIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import IsbnScanner from './IsbnScanner';
 import { fetchBookByIsbn } from '../../services/googleBooksService';
 import { fetchBookFromNli } from '../../services/nliService';
-import type { Book, BookFormData, Author } from '../../types/book';
+import type { Book, BookFormData, Author, Series } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
 
 interface BookFormProps {
@@ -43,11 +46,12 @@ interface BookFormProps {
   onSubmit: (data: BookFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
+  existingSeries?: Series[];
 }
 
 const emptyAuthor: Author = { firstName: '', lastName: '' };
 
-export default function BookForm({ initialData, onSubmit, onCancel, isLoading }: BookFormProps) {
+export default function BookForm({ initialData, onSubmit, onCancel, isLoading, existingSeries = [] }: BookFormProps) {
   const [internalId, setInternalId] = useState(initialData?.internalId || '');
   const [title, setTitle] = useState(initialData?.title || '');
   const [originalTitle, setOriginalTitle] = useState(initialData?.originalTitle || '');
@@ -79,6 +83,8 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
     initialData?.personalRating || null
   );
 
+  const [genreOpen, setGenreOpen] = useState(false);
+  const [subGenreOpen, setSubGenreOpen] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [additionalExpanded, setAdditionalExpanded] = useState(!!initialData?.isbn);
   const [lookingUp, setLookingUp] = useState(false);
@@ -134,7 +140,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
     initialData?.series?.volumeNumber?.toString() || ''
   );
   const [volumePart, setVolumePart] = useState<string>(
-    initialData?.series?.volumePart?.toString() || ''
+    initialData?.series?.volumePart || ''
   );
   const [totalVolumes, setTotalVolumes] = useState<string>(
     initialData?.series?.totalVolumes?.toString() || ''
@@ -191,7 +197,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
       bookData.series = {
         name: seriesName,
         volumeNumber: volumeNumber ? parseInt(volumeNumber) : undefined,
-        volumePart: volumePart ? parseInt(volumePart) : undefined,
+        volumePart: volumePart || undefined,
         totalVolumes: totalVolumes ? parseInt(totalVolumes) : undefined,
         hasUntranslatedBooks,
       };
@@ -272,6 +278,9 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
                 <InputLabel>ז׳אנרים</InputLabel>
                 <Select<string[]>
                   multiple
+                  open={genreOpen}
+                  onOpen={() => setGenreOpen(true)}
+                  onClose={() => setGenreOpen(false)}
                   value={genres}
                   onChange={(e) => setGenres(e.target.value as string[])}
                   input={<OutlinedInput label="ז׳אנרים" />}
@@ -283,6 +292,16 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
                     </Box>
                   )}
                 >
+                  <MenuItem
+                    onClickCapture={(e) => { e.stopPropagation(); setGenreOpen(false); }}
+                    sx={{ justifyContent: 'flex-end', py: 0.5 }}
+                    disableRipple
+                  >
+                    <Tooltip title="סגור">
+                      <IconButton size="small"><CloseIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </MenuItem>
+                  <Divider />
                   {GENRES.map((g) => (
                     <MenuItem key={g} value={g}>{g}</MenuItem>
                   ))}
@@ -294,6 +313,9 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
                 <InputLabel>תת-ז׳אנרים</InputLabel>
                 <Select<string[]>
                   multiple
+                  open={subGenreOpen}
+                  onOpen={() => setSubGenreOpen(true)}
+                  onClose={() => setSubGenreOpen(false)}
                   value={subGenres}
                   onChange={(e) => setSubGenres(e.target.value as string[])}
                   input={<OutlinedInput label="תת-ז׳אנרים" />}
@@ -305,6 +327,16 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
                     </Box>
                   )}
                 >
+                  <MenuItem
+                    onClickCapture={(e) => { e.stopPropagation(); setSubGenreOpen(false); }}
+                    sx={{ justifyContent: 'flex-end', py: 0.5 }}
+                    disableRipple
+                  >
+                    <Tooltip title="סגור">
+                      <IconButton size="small"><CloseIcon fontSize="small" /></IconButton>
+                    </Tooltip>
+                  </MenuItem>
+                  <Divider />
                   {SUB_GENRES.map((g) => (
                     <MenuItem key={g} value={g}>{g}</MenuItem>
                   ))}
@@ -402,13 +434,35 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading }:
             <AccordionDetails>
               <Grid container spacing={2}>
                 <Grid size={{ xs: 12, sm: 6 }}>
-                  <TextField fullWidth label="שם הסדרה" value={seriesName} onChange={(e) => setSeriesName(e.target.value)} />
+                  <Autocomplete
+                    freeSolo
+                    options={existingSeries.map((s) => s.name).filter(
+                      (name, idx, arr) => arr.indexOf(name) === idx
+                    )}
+                    value={seriesName}
+                    onInputChange={(_, newValue) => {
+                      setSeriesName(newValue);
+                      if (!newValue) setTotalVolumes('');
+                    }}
+                    onChange={(_, selectedValue) => {
+                      if (typeof selectedValue === 'string' && selectedValue) {
+                        setSeriesName(selectedValue);
+                        const match = existingSeries.find((s) => s.name === selectedValue);
+                        if (match?.totalVolumes) {
+                          setTotalVolumes(String(match.totalVolumes));
+                        }
+                      }
+                    }}
+                    renderInput={(params) => (
+                      <TextField {...params} fullWidth label="שם הסדרה" />
+                    )}
+                  />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3 }}>
                   <TextField fullWidth label="מספר כרך" type="number" value={volumeNumber} onChange={(e) => setVolumeNumber(e.target.value)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3 }}>
-                  <TextField fullWidth label="חלק בכרך" type="number" value={volumePart} onChange={(e) => setVolumePart(e.target.value)} />
+                  <TextField fullWidth label="חלק בכרך" value={volumePart} onChange={(e) => setVolumePart(e.target.value)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 3 }}>
                   <TextField fullWidth label="סה״כ כרכים" type="number" value={totalVolumes} onChange={(e) => setTotalVolumes(e.target.value)} />
