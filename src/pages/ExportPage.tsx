@@ -26,6 +26,7 @@ function flattenBook(book: Book) {
     'שפה': book.language || '',
     'שפה מקורית': book.originalLanguage || '',
     'ISBN': book.isbn || '',
+    'דאנאקוד': book.danacode || '',
     'שנת הוצאה': book.publishedYear || '',
     'מתורגם ע״י': book.translatedBy || '',
     'שנת תרגום': book.translationPublishingYear || '',

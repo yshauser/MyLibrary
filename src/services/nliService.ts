@@ -67,6 +67,7 @@ export async function fetchBookFromNli(isbn: string): Promise<GoogleBookData | n
   }
 
   const url = `https://api.nli.org.il/openlibrary/search?api_key=${apiKey}&query=any,exact,${isbn}`;
+  //console.log ("URL: ", url);  
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`NLI API error: ${response.status}`);

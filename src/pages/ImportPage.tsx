@@ -28,6 +28,7 @@ interface ParsedRow {
   genres: string[];
   subGenres: string[];
   isbn?: string;
+  danacode?: string;
   publishedYear?: number;
   publishingHouse?: string;
   edition?: string;
@@ -99,6 +100,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     genres,
     subGenres,
     isbn: String(row['ISBN'] || '').trim() || undefined,
+    danacode: String(row['דאנאקוד'] || '').trim() || undefined,
     publishedYear: publishedYear && !isNaN(publishedYear) ? publishedYear : undefined,
     publishingHouse: String(row['הוצאה לאור'] || '').trim() || undefined,
     edition: String(row['מהדורה'] || '').trim() || undefined,
@@ -134,6 +136,7 @@ function parsedRowToBookFormData(row: ParsedRow): BookFormData {
   };
 
   if (row.isbn) data.isbn = row.isbn;
+  if (row.danacode) data.danacode = row.danacode;
   if (row.publishedYear) data.publishedYear = row.publishedYear;
   if (row.publishingHouse) data.publishingHouse = row.publishingHouse;
   if (row.edition) data.edition = row.edition;
