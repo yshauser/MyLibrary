@@ -38,6 +38,7 @@ import {
 import IsbnScanner from './IsbnScanner';
 import { fetchBookByIsbn } from '../../services/googleBooksService';
 import { fetchBookFromNli } from '../../services/nliService';
+import { fetchBookByDanacode } from '../../services/bookScraperService';
 import { toLongDanacode, toShortDanacode, extractDanacode } from '../../utils/danacode';
 import type { Book, BookFormData, Author, Series } from '../../types/book';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
@@ -159,6 +160,10 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
       if (!data) {
         console.log('NLI returned no results for danacode, falling back to Google Books');
         data = await fetchBookByIsbn(long);
+      }
+      if (!data) {
+        console.log('Google Books returned no results for danacode, falling back to web scraper');
+        data = await fetchBookByDanacode(danacode);
       }
 
       if (!data) {

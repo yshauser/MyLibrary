@@ -1,7 +1,7 @@
 {
   "name": "mylibrary",
   "private": true,
-  "version": "1.4.05",
+  "version": "1.4.06",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -38,6 +38,8 @@
     "@types/react-dom": "^19.2.3",
     "@types/stylis": "^4.2.7",
     "@vitejs/plugin-react-swc": "^4.2.2",
+    "axios": "^1.18.1",
+    "cheerio": "^1.2.0",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.4.24",
