@@ -88,6 +88,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
   const [subGenreFilter, setSubGenreFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loanFilter, setLoanFilter] = useState('');
+  const [seriesFilter, setSeriesFilter] = useState('');
   const [orderBy, setOrderBy] = useState<SortableField>('internalId');
   const [order, setOrder] = useState<Order>('asc');
   const [page, setPage] = useState(0);
@@ -100,6 +101,14 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     setOrder(isAsc ? 'desc' : 'asc');
     setOrderBy(field);
   };
+
+  const availableSeries = useMemo(() => {
+    const names = new Set<string>();
+    books.forEach((book) => {
+      if (book.series?.name) names.add(book.series.name);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'he'));
+  }, [books]);
 
   const filteredAndSortedBooks = useMemo(() => {
     let filtered = [...books];
@@ -132,6 +141,10 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
       filtered = filtered.filter((book) => book.readingStatus === statusFilter);
     }
 
+    if (seriesFilter) {
+      filtered = filtered.filter((book) => book.series?.name === seriesFilter);
+    }
+
     if (loanFilter === 'loaned') {
       filtered = filtered.filter((book) => book.currentLoan);
     } else if (loanFilter === 'available') {
@@ -153,7 +166,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     });
 
     return filtered;
-  }, [books, searchQuery, genreFilter, subGenreFilter, statusFilter, loanFilter, orderBy, order]);
+  }, [books, searchQuery, genreFilter, subGenreFilter, statusFilter, seriesFilter, loanFilter, orderBy, order]);
 
   const paginatedBooks = useMemo(() => {
     const start = page * rowsPerPage;
@@ -166,11 +179,12 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     setSubGenreFilter('');
     setStatusFilter('');
     setLoanFilter('');
+    setSeriesFilter('');
     setPage(0);
   };
 
-  const activeFilterCount = [genreFilter, subGenreFilter, statusFilter, loanFilter].filter(Boolean).length;
-  const hasActiveFilters = searchQuery || genreFilter || subGenreFilter || statusFilter || loanFilter;
+  const activeFilterCount = [genreFilter, subGenreFilter, statusFilter, loanFilter, seriesFilter].filter(Boolean).length;
+  const hasActiveFilters = searchQuery || genreFilter || subGenreFilter || statusFilter || loanFilter || seriesFilter;
 
   const filterDropdowns = (
     <Stack direction={isMobile ? 'column' : 'row'} spacing={2} flexWrap="wrap" useFlexGap>
@@ -210,6 +224,19 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           <MenuItem value="">הכל</MenuItem>
           {Object.entries(READING_STATUSES).map(([key, label]) => (
             <MenuItem key={key} value={key}>{label}</MenuItem>
+          ))}
+        </Select>
+      </FormControl>
+      <FormControl size="small" sx={{ minWidth: 140 }}>
+        <InputLabel>סדרה</InputLabel>
+        <Select
+          value={seriesFilter}
+          label="סדרה"
+          onChange={(e: SelectChangeEvent) => { setSeriesFilter(e.target.value); setPage(0); }}
+        >
+          <MenuItem value="">הכל</MenuItem>
+          {availableSeries.map((s) => (
+            <MenuItem key={s} value={s}>{s}</MenuItem>
           ))}
         </Select>
       </FormControl>

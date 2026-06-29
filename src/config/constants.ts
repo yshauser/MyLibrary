@@ -17,6 +17,12 @@ export const GENRES = [
 export const SUB_GENRES = [
   'נוער',
   'אימה',
+  'קוסמיר',
+  'רומח הדרקון',
+  'ממלכות נשכחות',
+  'אווטאר',
+  'הארי פוטר',
+  'פרסי ג\'קסון',
 ] as const;
 
 export const READING_STATUSES = {
