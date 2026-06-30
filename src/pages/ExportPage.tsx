@@ -33,6 +33,7 @@ function flattenBook(book: Book) {
     'הוצאה לאור': book.publishingHouse || '',
     'מהדורה': book.edition || '',
     'מספר עמודים': book.numberOfPages || '',
+    'משקל': book.weight || '',
     'שם סדרה': book.series?.name || '',
     'מספר כרך': book.series?.volumeNumber || '',
     'חלק בכרך': book.series?.volumePart || '',

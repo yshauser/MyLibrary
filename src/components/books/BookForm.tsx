@@ -81,6 +81,9 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
   const [numberOfPages, setNumberOfPages] = useState<string>(
     initialData?.numberOfPages?.toString() || ''
   );
+  const [weight, setWeight] = useState<string>(
+    initialData?.weight?.toString() || ''
+  );
   const [coverImageUrl, setCoverImageUrl] = useState(initialData?.coverImageUrl || '');
   const [genres, setGenres] = useState<string[]>(initialData?.genres || []);
   const [subGenres, setSubGenres] = useState<string[]>(initialData?.subGenres || []);
@@ -242,6 +245,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
     if (publishingHouse) bookData.publishingHouse = publishingHouse;
     if (edition) bookData.edition = edition;
     if (numberOfPages) bookData.numberOfPages = parseInt(numberOfPages);
+    if (weight) bookData.weight = parseInt(weight);
     if (coverImageUrl) bookData.coverImageUrl = coverImageUrl;
 
     if (hasSeries && seriesName) {
@@ -489,6 +493,9 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="מספר עמודים" type="number" value={numberOfPages} onChange={(e) => setNumberOfPages(e.target.value)} />
+                </Grid>
+                <Grid size={{ xs: 6, sm: 4 }}>
+                  <TextField fullWidth label="משקל (גרם)" type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 4 }}>
                   <TextField fullWidth label="שפה" value={language} onChange={(e) => setLanguage(e.target.value)} />

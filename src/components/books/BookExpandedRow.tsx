@@ -64,6 +64,7 @@ export default function BookExpandedRow({ book }: BookExpandedRowProps) {
           <InfoField label="הוצאה לאור" value={book.publishingHouse} />
           <InfoField label="מהדורה" value={book.edition} />
           <InfoField label="מספר עמודים" value={book.numberOfPages} />
+          {book.weight && <InfoField label="משקל" value={`${book.weight} גרם`} />}
           <InfoField label="שפה" value={book.language} />
           {book.originalTitle && (
             <>

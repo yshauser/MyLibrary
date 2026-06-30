@@ -44,6 +44,7 @@ export interface Book {
   publishingHouse?: string;
   edition?: string;
   numberOfPages?: number;
+  weight?: number;
   coverImageUrl?: string;
   series?: Series;
   genres: string[];

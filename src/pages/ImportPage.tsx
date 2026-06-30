@@ -38,6 +38,7 @@ interface ParsedRow {
   translatedBy?: string;
   translationPublishingYear?: number;
   numberOfPages?: number;
+  weight?: number;
   seriesName?: string;
   volumeNumber?: number;
   volumePart?: string;
@@ -88,6 +89,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
   const publishedYear = row['שנת הוצאה'] ? Number(row['שנת הוצאה']) : undefined;
   const translationPublishingYear = row['שנת תרגום'] ? Number(row['שנת תרגום']) : undefined;
   const numberOfPages = row['מספר עמודים'] ? Number(row['מספר עמודים']) : undefined;
+  const weight = row['משקל'] ? Number(row['משקל']) : undefined;
   const volumeNumber = row['מספר כרך'] ? Number(row['מספר כרך']) : undefined;
   const volumePart = String(row['חלק בכרך'] || '').trim() || undefined;
   const totalVolumes = row['סה״כ כרכים'] ? Number(row['סה״כ כרכים']) : undefined;
@@ -110,6 +112,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     translatedBy: String(row['מתורגם ע״י'] || '').trim() || undefined,
     translationPublishingYear: translationPublishingYear && !isNaN(translationPublishingYear) ? translationPublishingYear : undefined,
     numberOfPages: numberOfPages && !isNaN(numberOfPages) ? numberOfPages : undefined,
+    weight: weight && !isNaN(weight) ? weight : undefined,
     seriesName: String(row['שם סדרה'] || '').trim() || undefined,
     volumeNumber: volumeNumber && !isNaN(volumeNumber) ? volumeNumber : undefined,
     volumePart,
@@ -146,6 +149,7 @@ function parsedRowToBookFormData(row: ParsedRow): BookFormData {
   if (row.translatedBy) data.translatedBy = row.translatedBy;
   if (row.translationPublishingYear) data.translationPublishingYear = row.translationPublishingYear;
   if (row.numberOfPages) data.numberOfPages = row.numberOfPages;
+  if (row.weight) data.weight = row.weight;
   if (row.comments) data.comments = row.comments;
   if (row.physicalLocation) data.physicalLocation = row.physicalLocation;
   if (row.readingStatus) data.readingStatus = row.readingStatus as BookFormData['readingStatus'];
