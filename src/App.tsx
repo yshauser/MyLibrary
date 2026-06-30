@@ -1,5 +1,8 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AnimatePresence } from 'framer-motion';
 import Layout from './components/layout/Layout';
+import SplashScreen from './components/layout/SplashScreen';
 import LibraryPage from './pages/LibraryPage';
 import AddBookPage from './pages/AddBookPage';
 import EditBookPage from './pages/EditBookPage';
@@ -17,9 +20,23 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const MIN_SPLASH_MS = 1000;
+
 function App() {
+  const { loading } = useAuth();
+  const [minElapsed, setMinElapsed] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setMinElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const showSplash = loading || !minElapsed;
+
   return (
-    <BrowserRouter basename="/MyLibrary">
+    <>
+      <AnimatePresence>{showSplash && <SplashScreen />}</AnimatePresence>
+      <BrowserRouter basename="/MyLibrary">
       <Layout>
         <Routes>
           <Route path="/" element={<LibraryPage />} />
@@ -69,6 +86,7 @@ function App() {
         </Routes>
       </Layout>
     </BrowserRouter>
+    </>
   );
 }
 
