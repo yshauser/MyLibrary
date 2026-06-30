@@ -7,6 +7,8 @@ export interface GoogleBookData {
   publishingHouse?: string;
   language?: string;
   numberOfPages?: number;
+  weight?: number;
+  translationPublishingYear?: number;
   coverImageUrl?: string;
 }
 

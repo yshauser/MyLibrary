@@ -214,12 +214,131 @@ async function enrichFromSimania(partial) {
     }
     return partial;
 }
+// ─── Opus.co.il Scraper ─────────────────────────────────────────────
+/**
+ * Scrape book data from opus.co.il by danacode.
+ * Opus uses the short danacode format in the URL:
+ *   https://opus.co.il/?id=showbook&catnum=348-7195
+ * Some books also work with just the internal number:
+ *   https://opus.co.il/?id=showbook&catnum=7164
+ *
+ * Extracts: numberOfPages, weight, translationPublishingYear, translatedBy,
+ *           danacode (מסת"ב), title, authors, coverImageUrl.
+ * Sets publishingHouse to "אופוס" for books found on this site.
+ */
+async function scrapeFromOpus(danacode) {
+    const shortCode = normalizeDanacodeForSearch(danacode);
+    // Try full short-format first (e.g. "348-7195"), then just the internal part
+    const candidates = [shortCode];
+    const dashIdx = shortCode.indexOf("-");
+    if (dashIdx !== -1) {
+        candidates.push(shortCode.substring(dashIdx + 1));
+    }
+    for (const catnum of candidates) {
+        const url = `https://opus.co.il/?id=showbook&catnum=${encodeURIComponent(catnum)}`;
+        console.log(`[Opus] Trying: ${url}`);
+        let html;
+        try {
+            const response = await axios_1.default.get(url, {
+                headers: { "User-Agent": USER_AGENT },
+                timeout: REQUEST_TIMEOUT,
+            });
+            html = response.data;
+        }
+        catch (err) {
+            console.log(`[Opus] Request failed for catnum=${catnum}:`, err instanceof Error ? err.message : err);
+            continue;
+        }
+        const $ = cheerio.load(html);
+        // Check if this is a valid book page (has an H1 with a title)
+        const h1 = $("h1").first().text().trim();
+        if (!h1) {
+            console.log(`[Opus] No H1 found for catnum=${catnum}, skipping`);
+            continue;
+        }
+        const result = {};
+        result.title = h1;
+        result.publishingHouse = "אופוס";
+        // Extract labeled fields from the page.
+        // Opus uses label-value patterns in various elements.
+        // We scan for Hebrew labels: עמודים, משקל, שנת הוצאה, תרגום, מסת"ב
+        const labelMap = {};
+        $("span, div, p, td, li, label, strong, b, dt, dd").each((_i, el) => {
+            const text = $(el).text().trim().replace(/\s+/g, " ");
+            if (text.length > 2 && text.length < 200) {
+                // "Label: Value" pattern
+                const colonMatch = text.match(/^(עמודים|משקל|שנת הוצאה|תרגום|מסת"ב|מסת״ב|ISBN)\s*:\s*(.+)$/);
+                if (colonMatch) {
+                    labelMap[colonMatch[1]] = colonMatch[2].trim();
+                }
+            }
+        });
+        console.log("[Opus] Labeled fields found:", labelMap);
+        // --- Pages ---
+        const pagesKey = Object.keys(labelMap).find((k) => k === "עמודים");
+        if (pagesKey) {
+            const pages = parseInt(labelMap[pagesKey], 10);
+            if (!isNaN(pages) && pages > 0)
+                result.numberOfPages = pages;
+        }
+        // --- Weight ---
+        const weightKey = Object.keys(labelMap).find((k) => k === "משקל");
+        if (weightKey) {
+            const w = parseFloat(labelMap[weightKey].replace(/[^\d.]/g, ""));
+            if (!isNaN(w) && w > 0)
+                result.weight = w;
+        }
+        // --- Year (translation publishing year, since Opus publishes translations) ---
+        const yearKey = Object.keys(labelMap).find((k) => k === "שנת הוצאה");
+        if (yearKey) {
+            const year = parseInt(labelMap[yearKey], 10);
+            if (!isNaN(year) && year > 1000 && year < 2100) {
+                result.translationPublishingYear = year;
+            }
+        }
+        // --- Translator ---
+        const transKey = Object.keys(labelMap).find((k) => k === "תרגום");
+        if (transKey) {
+            result.translatedBy = labelMap[transKey];
+        }
+        // --- ISBN / Danacode (labeled as מסת"ב on Opus) ---
+        const isbnKey = Object.keys(labelMap).find((k) => k === 'מסת"ב' || k === "מסת״ב" || k === "ISBN");
+        if (isbnKey) {
+            // Opus stores the danacode under the מסת"ב label
+            const val = labelMap[isbnKey].trim();
+            if (val)
+                result.publishedYear = undefined; // don't overwrite — handled above
+        }
+        // --- Author (from breadcrumb or contributor link) ---
+        const authorLink = $('a[href*="showcontrib"]').first().text().trim();
+        if (authorLink) {
+            result.authors = [authorLink];
+        }
+        // --- Cover Image ---
+        const ogImage = $('meta[property="og:image"]').attr("content");
+        if (ogImage) {
+            result.coverImageUrl = ogImage.startsWith("http")
+                ? ogImage
+                : `https://opus.co.il${ogImage}`;
+        }
+        // Check we got something useful
+        if (!result.title && !result.authors) {
+            console.log("[Opus] Could not extract book data");
+            continue;
+        }
+        console.log("[Opus] Extracted:", result);
+        return result;
+    }
+    return null;
+}
 // ─── Main Entry Point ────────────────────────────────────────────────
 /**
  * Fetch book data by danacode.
  * 1. Searches bookme.co.il by danacode (their search-suggestions API)
  * 2. Enriches missing fields from simania.co.il JSON API (title search)
- * Returns null if no data could be extracted.
+ * 3. Tries opus.co.il for Opus-published books (supports direct danacode URL)
+ * Each source fills in only missing fields so earlier data is preserved.
+ * Returns null if no data could be extracted from any source.
  */
 async function fetchBookByDanacode(danacode) {
     if (!danacode || !danacode.trim()) {
@@ -233,15 +352,46 @@ async function fetchBookByDanacode(danacode) {
     catch (err) {
         console.error("[Bookme] Scrape error:", err instanceof Error ? err.message : err);
     }
-    if (!result) {
-        return null;
-    }
     // Step 2: Enrich with Simania data (title-based search for extra fields)
+    if (result) {
+        try {
+            result = await enrichFromSimania(result);
+        }
+        catch (err) {
+            console.error("[Simania] Enrichment error:", err instanceof Error ? err.message : err);
+        }
+    }
+    // Step 3: Try Opus (publisher site — supports direct danacode URL lookup)
     try {
-        result = await enrichFromSimania(result);
+        const opusData = await scrapeFromOpus(danacode);
+        if (opusData) {
+            if (!result) {
+                // Opus is the only source that returned data
+                result = opusData;
+            }
+            else {
+                // Merge Opus data into existing result (fill missing fields only)
+                if (!result.numberOfPages && opusData.numberOfPages)
+                    result.numberOfPages = opusData.numberOfPages;
+                if (!result.weight && opusData.weight)
+                    result.weight = opusData.weight;
+                if (!result.translationPublishingYear && opusData.translationPublishingYear)
+                    result.translationPublishingYear = opusData.translationPublishingYear;
+                if (!result.translatedBy && opusData.translatedBy)
+                    result.translatedBy = opusData.translatedBy;
+                if (!result.coverImageUrl && opusData.coverImageUrl)
+                    result.coverImageUrl = opusData.coverImageUrl;
+                if (!result.authors && opusData.authors)
+                    result.authors = opusData.authors;
+                if (!result.title && opusData.title)
+                    result.title = opusData.title;
+                if (!result.publishingHouse && opusData.publishingHouse)
+                    result.publishingHouse = opusData.publishingHouse;
+            }
+        }
     }
     catch (err) {
-        console.error("[Simania] Enrichment error:", err instanceof Error ? err.message : err);
+        console.error("[Opus] Scrape error:", err instanceof Error ? err.message : err);
     }
     return result;
 }

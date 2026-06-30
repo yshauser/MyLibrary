@@ -117,6 +117,8 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
     if (data.publishingHouse && !publishingHouse) setPublishingHouse(data.publishingHouse);
     if (data.publishedYear && !publishedYear) setPublishedYear(String(data.publishedYear));
     if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
+    if (data.weight && !weight) setWeight(String(data.weight));
+    if (data.translationPublishingYear && !translationPublishingYear) setTranslationPublishingYear(String(data.translationPublishingYear));
     if (data.language && !language) setLanguage(data.language);
     if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
     setAdditionalExpanded(true);
@@ -159,10 +161,19 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
         return;
       }
 
-      let data = await fetchBookFromNli(long);
+      let data: Awaited<ReturnType<typeof fetchBookByIsbn>> = null;
+      try {
+        data = await fetchBookFromNli(long);
+      } catch (err) {
+        console.warn('NLI lookup failed for danacode, continuing:', err);
+      }
       if (!data) {
         console.log('NLI returned no results for danacode, falling back to Google Books');
-        data = await fetchBookByIsbn(long);
+        try {
+          data = await fetchBookByIsbn(long);
+        } catch (err) {
+          console.warn('Google Books lookup failed for danacode, continuing:', err);
+        }
       }
       if (!data) {
         console.log('Google Books returned no results for danacode, falling back to web scraper');
