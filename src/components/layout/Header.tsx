@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   AppBar,
   Toolbar,
@@ -17,6 +17,14 @@ import {
   Divider,
   useMediaQuery,
   useTheme,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -28,6 +36,7 @@ import {
   BarChart as StatsIcon,
   History as LogIcon,
   FormatListBulleted as WishlistIcon,
+  VpnKey as KeyIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -43,12 +52,33 @@ const adminNavItems = [
 ];
 
 export default function Header() {
-  const { isAdmin, logout } = useAuth();
+  const { isAdmin, login, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const version = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '';
+  const [versionSnackOpen, setVersionSnackOpen] = useState(false);
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleTitleTouchStart = useCallback(() => {
+    longPressTimer.current = setTimeout(() => {
+      setVersionSnackOpen(true);
+    }, 600);
+  }, []);
+
+  const handleTitleTouchEnd = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }, []);
 
   const allNavItems = isAdmin ? [...navItems, ...adminNavItems] : navItems;
 
@@ -59,6 +89,27 @@ export default function Header() {
 
   const handleTabChange = (_: React.SyntheticEvent, newValue: number) => {
     navigate(allNavItems[newValue].path);
+  };
+
+  const handleLogin = async () => {
+    setLoginError('');
+    setLoginLoading(true);
+    try {
+      await login(email, password);
+      setLoginOpen(false);
+      setEmail('');
+      setPassword('');
+    } catch {
+      setLoginError('שם משתמש או סיסמה שגויים');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLoginKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleLogin();
+    }
   };
 
   const handleLogout = async () => {
@@ -73,6 +124,7 @@ export default function Header() {
   };
 
   return (
+    <>
     <AppBar position="sticky" sx={{ bgcolor: 'primary.main' }}>
       <Toolbar sx={{ minHeight: { xs: 56, sm: 64 } }}>
         {isMobile && (
@@ -86,14 +138,19 @@ export default function Header() {
           </IconButton>
         )}
 
-        <Typography
-          variant={isMobile ? 'h6' : 'h5'}
-          component="div"
-          sx={{ fontWeight: 700, cursor: 'pointer' }}
-          onClick={() => navigate('/')}
-        >
-          📚 הספרייה שלי
-        </Typography>
+        <Tooltip title={version ? `v${version}` : ''} arrow>
+          <Typography
+            variant={isMobile ? 'h6' : 'h5'}
+            component="div"
+            sx={{ fontWeight: 700, cursor: 'pointer', userSelect: 'none' }}
+            onClick={() => navigate('/')}
+            onTouchStart={handleTitleTouchStart}
+            onTouchEnd={handleTitleTouchEnd}
+            onContextMenu={(e) => e.preventDefault()}
+          >
+            📚 הספרייה שלי
+          </Typography>
+        </Tooltip>
 
         {!isMobile && (
           <Tabs
@@ -135,6 +192,17 @@ export default function Header() {
             </Tooltip>
           </Box>
         )}
+        {!isMobile && !isAdmin && (
+          <Tooltip title="כניסת מנהל">
+            <IconButton
+              color="inherit"
+              onClick={() => setLoginOpen(true)}
+              sx={{ opacity: 0.4, '&:hover': { opacity: 1 } }}
+            >
+              <KeyIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
       </Toolbar>
 
       {/* Mobile Drawer */}
@@ -143,7 +211,7 @@ export default function Header() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
       >
-        <Box sx={{ width: 240, pt: 1 }} role="presentation">
+        <Box sx={{ width: 240, pt: 1, display: 'flex', flexDirection: 'column', height: '100%' }} role="presentation">
           <List>
             {allNavItems.map((item) => (
               <ListItem key={item.path} disablePadding>
@@ -157,7 +225,7 @@ export default function Header() {
               </ListItem>
             ))}
           </List>
-          {isAdmin && (
+          {isAdmin ? (
             <>
               <Divider />
               <List>
@@ -188,9 +256,82 @@ export default function Header() {
                 </ListItem>
               </List>
             </>
+          ) : (
+            <>
+              <Divider />
+              <List>
+                <ListItem disablePadding>
+                  <ListItemButton onClick={() => { setDrawerOpen(false); setLoginOpen(true); }}>
+                    <ListItemIcon><KeyIcon /></ListItemIcon>
+                    <ListItemText primary="כניסת מנהל" />
+                  </ListItemButton>
+                </ListItem>
+              </List>
+            </>
           )}
         </Box>
+        {version && (
+          <Box sx={{ mt: 'auto', p: 2, textAlign: 'center' }}>
+            <Typography variant="caption" color="text.disabled">
+              v{version}
+            </Typography>
+          </Box>
+        )}
       </Drawer>
     </AppBar>
+
+      <Dialog
+        open={loginOpen}
+        onClose={() => setLoginOpen(false)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>כניסת מנהל</DialogTitle>
+        <DialogContent>
+          {loginError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {loginError}
+            </Alert>
+          )}
+          <TextField
+            autoFocus
+            margin="dense"
+            label="אימייל"
+            type="email"
+            fullWidth
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            onKeyDown={handleLoginKeyDown}
+          />
+          <TextField
+            margin="dense"
+            label="סיסמה"
+            type="password"
+            fullWidth
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            onKeyDown={handleLoginKeyDown}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLoginOpen(false)}>ביטול</Button>
+          <Button
+            onClick={handleLogin}
+            variant="contained"
+            disabled={loginLoading || !email || !password}
+          >
+            {loginLoading ? 'מתחבר...' : 'התחבר'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={versionSnackOpen}
+        autoHideDuration={2000}
+        onClose={() => setVersionSnackOpen(false)}
+        message={`v${version}`}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      />
+    </>
   );
 }
