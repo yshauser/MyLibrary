@@ -20,7 +20,7 @@ function AdminRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const MIN_SPLASH_MS = 1500;
+const MIN_SPLASH_MS = 2500;
 
 function App() {
   const { loading } = useAuth();

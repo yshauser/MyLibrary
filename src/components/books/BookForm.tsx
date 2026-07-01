@@ -180,6 +180,20 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
         data = await fetchBookByDanacode(danacode);
       }
 
+      // If we got data but title or authors are missing, try the web scraper to fill them in
+      if (data && (!data.title || !data.authors?.length)) {
+        console.log('Data incomplete (missing title or authors), trying web scraper to fill gaps');
+        try {
+          const scraperData = await fetchBookByDanacode(danacode);
+          if (scraperData) {
+            if (!data.title && scraperData.title) data.title = scraperData.title;
+            if (!data.authors?.length && scraperData.authors?.length) data.authors = scraperData.authors;
+          }
+        } catch (err) {
+          console.warn('Web scraper supplemental lookup failed:', err);
+        }
+      }
+
       if (!data) {
         setDanacodeError('לא נמצא ספר עם דאנאקוד זה');
         return;
