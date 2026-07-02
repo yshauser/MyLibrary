@@ -101,13 +101,18 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
   const [lookingUp, setLookingUp] = useState(false);
   const [lookupError, setLookupError] = useState('');
 
-  const applyLookupData = (data: Awaited<ReturnType<typeof fetchBookByIsbn>>) => {
+  const applyLookupData = (data: Awaited<ReturnType<typeof fetchBookByIsbn>>, lastNameFirst = false) => {
     if (!data) return;
     if (data.title && !title) setTitle(data.title);
     if (data.originalTitle && !originalTitle) setOriginalTitle(data.originalTitle);
     if (data.authors?.length && (!authors.length || (authors.length === 1 && !authors[0].firstName && !authors[0].lastName))) {
       setAuthors(data.authors.map((name) => {
         const parts = name.trim().split(' ');
+        if (lastNameFirst) {
+          const lastName = parts.shift() || '';
+          const firstName = parts.join(' ');
+          return { firstName, lastName };
+        }
         const lastName = parts.pop() || '';
         const firstName = parts.join(' ');
         return { firstName, lastName };
@@ -199,7 +204,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
         return;
       }
 
-      applyLookupData(data);
+      applyLookupData(data, true);
     } catch {
       setDanacodeError('שגיאה בחיפוש פרטי הספר');
     } finally {
