@@ -16,6 +16,8 @@ export interface ScrapedBookData {
   numberOfPages?: number;
   weight?: number;
   translationPublishingYear?: number;
+  isbn?: string;
+  originalLanguage?: string;
   coverImageUrl?: string;
 }
 
@@ -402,6 +404,139 @@ async function scrapeFromOpus(
   return null;
 }
 
+// ─── Ybook.co.il (Yedioth) Scraper ──────────────────────────────────
+
+/**
+ * Normalize danacode to dashless short format for Ybook URLs.
+ * "348-7195" → "3487195", "003600215032" → "3600215" (strip leading zeros + control).
+ */
+function danacodeForYbook(input: string): string {
+  const short = normalizeDanacodeForSearch(input);
+  // Remove the dash
+  return short.replace("-", "");
+}
+
+/**
+ * Scrape book data from ybook.co.il (Yedioth Books) by danacode.
+ * Ybook uses the short danacode without dash in the URL:
+ *   https://ybook.co.il/products/3621503
+ *
+ * Extracts: publishingHouse (הוצאה), numberOfPages (מס' עמודים),
+ *           originalLanguage (שפת מקור), originalTitle (שם הספר בלועזית),
+ *           isbn (ISBN), title, authors, coverImageUrl.
+ */
+async function scrapeFromYbook(
+  danacode: string
+): Promise<ScrapedBookData | null> {
+  const code = danacodeForYbook(danacode);
+  const url = `https://ybook.co.il/products/${encodeURIComponent(code)}`;
+  console.log(`[Ybook] Trying: ${url}`);
+
+  let html: string;
+  try {
+    const response = await axios.get<string>(url, {
+      headers: {"User-Agent": USER_AGENT},
+      timeout: REQUEST_TIMEOUT,
+    });
+    html = response.data;
+  } catch (err) {
+    console.log(`[Ybook] Request failed:`, err instanceof Error ? err.message : err);
+    return null;
+  }
+
+  const $ = cheerio.load(html);
+
+  // Check for a valid product page (H1 with book title)
+  const h1 = $("h1").first().text().trim();
+  if (!h1) {
+    console.log("[Ybook] No H1 found, not a valid book page");
+    return null;
+  }
+
+  const result: ScrapedBookData = {};
+  result.title = h1;
+
+  // Extract labeled fields from the page.
+  // Ybook uses a "פרטים נוספים" section with label-value patterns.
+  const labelMap: Record<string, string> = {};
+  $("span, div, p, td, li, label, strong, b, dt, dd").each((_i, el) => {
+    const text = $(el).text().trim().replace(/\s+/g, " ");
+    if (text.length > 2 && text.length < 300) {
+      const colonMatch = text.match(
+        /^(הוצאה|מס' עמודים|שפת מקור|שם הספר בלועזית|שם המחבר\/ת בלועזית|דאנאקוד|ISBN|סוג כריכה)\s*[:\s]\s*(.+)$/
+      );
+      if (colonMatch) {
+        labelMap[colonMatch[1]] = colonMatch[2].trim();
+      }
+    }
+  });
+
+  console.log("[Ybook] Labeled fields found:", labelMap);
+
+  // --- Publisher ---
+  if (labelMap["הוצאה"]) {
+    result.publishingHouse = labelMap["הוצאה"];
+  }
+
+  // --- Pages ---
+  if (labelMap["מס' עמודים"]) {
+    const pages = parseInt(labelMap["מס' עמודים"], 10);
+    if (!isNaN(pages) && pages > 0) result.numberOfPages = pages;
+  }
+
+  // --- Original Language ---
+  if (labelMap["שפת מקור"]) {
+    result.originalLanguage = labelMap["שפת מקור"];
+  }
+
+  // --- Original Title ---
+  if (labelMap["שם הספר בלועזית"]) {
+    result.originalTitle = labelMap["שם הספר בלועזית"];
+  }
+
+  // --- ISBN ---
+  if (labelMap["ISBN"]) {
+    result.isbn = labelMap["ISBN"].trim();
+  }
+
+  // --- Author (from contributor links or meta) ---
+  const ogDesc = $('meta[property="og:description"]').attr("content") || "";
+  // Try to find author from the page — Ybook often has author in the title area
+  const authorEl = $('a[href*="/collections/"]').filter((_i, el) => {
+    const href = $(el).attr("href") || "";
+    return href.includes("/collections/") && !href.includes("category");
+  }).first().text().trim();
+  if (authorEl) {
+    result.authors = [authorEl];
+  } else if (ogDesc) {
+    // OG description often ends with author name
+    const match = ogDesc.match(/[\.\s]([^\.]+)$/);
+    if (match) {
+      const possibleAuthor = match[1].trim().replace(/\.$/, "");
+      if (possibleAuthor.length > 2 && possibleAuthor.length < 50) {
+        result.authors = [possibleAuthor];
+      }
+    }
+  }
+
+  // --- Cover Image ---
+  const ogImage = $('meta[property="og:image"]').attr("content");
+  if (ogImage) {
+    result.coverImageUrl = ogImage.startsWith("http")
+      ? ogImage
+      : `https://ybook.co.il${ogImage}`;
+  }
+
+  // Check we got something useful
+  if (!result.title) {
+    console.log("[Ybook] Could not extract book data");
+    return null;
+  }
+
+  console.log("[Ybook] Extracted:", result);
+  return result;
+}
+
 // ─── Main Entry Point ────────────────────────────────────────────────
 
 /**
@@ -409,6 +544,7 @@ async function scrapeFromOpus(
  * 1. Searches bookme.co.il by danacode (their search-suggestions API)
  * 2. Enriches missing fields from simania.co.il JSON API (title search)
  * 3. Tries opus.co.il for Opus-published books (supports direct danacode URL)
+ * 4. Tries ybook.co.il for Yedioth-published books (supports direct danacode URL)
  * Each source fills in only missing fields so earlier data is preserved.
  * Returns null if no data could be extracted from any source.
  */
@@ -457,6 +593,28 @@ export async function fetchBookByDanacode(
     }
   } catch (err) {
     console.error("[Opus] Scrape error:", err instanceof Error ? err.message : err);
+  }
+
+  // Step 4: Try Ybook / Yedioth (publisher site — supports direct danacode URL lookup)
+  try {
+    const ybookData = await scrapeFromYbook(danacode);
+    if (ybookData) {
+      if (!result) {
+        result = ybookData;
+      } else {
+        // Merge Ybook data into existing result (fill missing fields only)
+        if (!result.numberOfPages && ybookData.numberOfPages) result.numberOfPages = ybookData.numberOfPages;
+        if (!result.publishingHouse && ybookData.publishingHouse) result.publishingHouse = ybookData.publishingHouse;
+        if (!result.originalLanguage && ybookData.originalLanguage) result.originalLanguage = ybookData.originalLanguage;
+        if (!result.originalTitle && ybookData.originalTitle) result.originalTitle = ybookData.originalTitle;
+        if (!result.isbn && ybookData.isbn) result.isbn = ybookData.isbn;
+        if (!result.coverImageUrl && ybookData.coverImageUrl) result.coverImageUrl = ybookData.coverImageUrl;
+        if (!result.authors && ybookData.authors) result.authors = ybookData.authors;
+        if (!result.title && ybookData.title) result.title = ybookData.title;
+      }
+    }
+  } catch (err) {
+    console.error("[Ybook] Scrape error:", err instanceof Error ? err.message : err);
   }
 
   return result;

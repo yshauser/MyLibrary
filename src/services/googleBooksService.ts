@@ -9,6 +9,8 @@ export interface GoogleBookData {
   numberOfPages?: number;
   weight?: number;
   translationPublishingYear?: number;
+  isbn?: string;
+  originalLanguage?: string;
   coverImageUrl?: string;
 }
 

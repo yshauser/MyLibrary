@@ -124,6 +124,8 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
     if (data.numberOfPages && !numberOfPages) setNumberOfPages(String(data.numberOfPages));
     if (data.weight && !weight) setWeight(String(data.weight));
     if (data.translationPublishingYear && !translationPublishingYear) setTranslationPublishingYear(String(data.translationPublishingYear));
+    if (data.isbn && !isbn) setIsbn(data.isbn);
+    if (data.originalLanguage && !originalLanguage) setOriginalLanguage(data.originalLanguage);
     if (data.language && !language) setLanguage(data.language);
     if (data.coverImageUrl && !coverImageUrl) setCoverImageUrl(data.coverImageUrl);
     setAdditionalExpanded(true);
