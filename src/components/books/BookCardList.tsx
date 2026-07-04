@@ -15,6 +15,8 @@ import {
   ListItemIcon,
   ListItemText,
   Avatar,
+  Dialog,
+  DialogContent,
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -24,6 +26,7 @@ import {
   KeyboardArrowDown,
   KeyboardArrowUp,
   MenuBook as BookIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import type { Book, ReadingStatus } from '../../types/book';
@@ -58,6 +61,7 @@ function BookCard({ book, onDelete, onLoan }: BookCardProps) {
   const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
+  const [coverOpen, setCoverOpen] = useState(false);
 
   const handleMenuOpen = (e: React.MouseEvent<HTMLElement>) => {
     e.stopPropagation();
@@ -84,6 +88,7 @@ function BookCard({ book, onDelete, onLoan }: BookCardProps) {
             component="img"
             src={book.coverImageUrl}
             alt={book.title}
+            onClick={(e) => { e.stopPropagation(); setCoverOpen(true); }}
             sx={{
               width: 52,
               height: 72,
@@ -91,6 +96,7 @@ function BookCard({ book, onDelete, onLoan }: BookCardProps) {
               borderRadius: 1,
               flexShrink: 0,
               mr: 1.5,
+              cursor: 'zoom-in',
             }}
           />
         ) : (
@@ -186,6 +192,32 @@ function BookCard({ book, onDelete, onLoan }: BookCardProps) {
             <ListItemText>מחיקה</ListItemText>
           </MenuItem>
         </Menu>
+      )}
+
+      {/* Cover image lightbox */}
+      {book.coverImageUrl && (
+        <Dialog
+          open={coverOpen}
+          onClose={() => setCoverOpen(false)}
+          maxWidth="sm"
+          onClick={() => setCoverOpen(false)}
+        >
+          <IconButton
+            onClick={(e) => { e.stopPropagation(); setCoverOpen(false); }}
+            sx={{ position: 'absolute', top: 8, right: 8, bgcolor: 'rgba(0,0,0,0.45)', color: 'white', zIndex: 1 }}
+            size="small"
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+          <DialogContent sx={{ p: 0, lineHeight: 0 }}>
+            <Box
+              component="img"
+              src={book.coverImageUrl}
+              alt={book.title}
+              sx={{ display: 'block', maxWidth: '100%', maxHeight: '80vh', cursor: 'zoom-out' }}
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Expanded details */}

@@ -277,15 +277,15 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
     if (publishingHouse) bookData.publishingHouse = publishingHouse;
     if (edition) bookData.edition = edition;
     if (numberOfPages) bookData.numberOfPages = parseInt(numberOfPages);
-    if (weight) bookData.weight = parseInt(weight);
+    if (weight) bookData.weight = parseFloat(weight);
     if (coverImageUrl) bookData.coverImageUrl = coverImageUrl;
 
     if (hasSeries && seriesName) {
       bookData.series = {
         name: seriesName,
-        volumeNumber: volumeNumber ? parseInt(volumeNumber) : undefined,
+        volumeNumber: volumeNumber ? parseFloat(volumeNumber) : undefined,
         volumePart: volumePart || undefined,
-        totalVolumes: totalVolumes ? parseInt(totalVolumes) : undefined,
+        totalVolumes: totalVolumes ? parseFloat(totalVolumes) : undefined,
         hasUntranslatedBooks,
       };
     }
