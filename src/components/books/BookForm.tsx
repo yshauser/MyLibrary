@@ -539,7 +539,7 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
                   <TextField fullWidth label="שפה מקורית" value={originalLanguage} onChange={(e) => setOriginalLanguage(e.target.value)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
-                  <TextField fullWidth label="מתורגם ע״י" value={translatedBy} onChange={(e) => setTranslatedBy(e.target.value)} />
+                  <TextField fullWidth label="תורגם ע״י" value={translatedBy} onChange={(e) => setTranslatedBy(e.target.value)} />
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <TextField fullWidth label="שנת תרגום" type="number" value={translationPublishingYear} onChange={(e) => setTranslationPublishingYear(e.target.value)} />

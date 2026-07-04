@@ -70,7 +70,7 @@ export default function BookExpandedRow({ book }: BookExpandedRowProps) {
             <>
               <InfoField label="שם מקורי" value={book.originalTitle} />
               <InfoField label="שפה מקורית" value={book.originalLanguage} />
-              <InfoField label="מתורגם ע״י" value={book.translatedBy} />
+              <InfoField label="תורגם ע״י" value={book.translatedBy} />
               <InfoField label="שנת תרגום" value={book.translationPublishingYear} />
             </>
           )}

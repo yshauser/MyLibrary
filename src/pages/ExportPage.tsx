@@ -28,7 +28,7 @@ function flattenBook(book: Book) {
     'ISBN': book.isbn || '',
     'דאנאקוד': book.danacode || '',
     'שנת הוצאה': book.publishedYear || '',
-    'מתורגם ע״י': book.translatedBy || '',
+    'תורגם ע״י': book.translatedBy || '',
     'שנת תרגום': book.translationPublishingYear || '',
     'הוצאה לאור': book.publishingHouse || '',
     'מהדורה': book.edition || '',

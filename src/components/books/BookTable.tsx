@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { toShortDanacode } from '../../utils/danacode';
 import {
   Table,
   TableBody,
@@ -38,7 +39,7 @@ import {
   Clear as ClearIcon,
   FilterList as FilterIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { Book, ReadingStatus } from '../../types/book';
 import { useAuth } from '../../contexts/AuthContext';
 import { GENRES, SUB_GENRES, READING_STATUSES } from '../../config/constants';
@@ -83,23 +84,54 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [genreFilter, setGenreFilter] = useState('');
-  const [subGenreFilter, setSubGenreFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [loanFilter, setLoanFilter] = useState('');
-  const [seriesFilter, setSeriesFilter] = useState('');
-  const [orderBy, setOrderBy] = useState<SortableField>('internalId');
-  const [order, setOrder] = useState<Order>('asc');
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchQuery = searchParams.get('search') ?? '';
+  const genreFilter = searchParams.get('genre') ?? '';
+  const subGenreFilter = searchParams.get('subGenre') ?? '';
+  const statusFilter = searchParams.get('status') ?? '';
+  const loanFilter = searchParams.get('loan') ?? '';
+  const seriesFilter = searchParams.get('series') ?? '';
+  const orderBy = (searchParams.get('orderBy') as SortableField) || 'internalId';
+  const order = (searchParams.get('order') as Order) || 'asc';
+  const page = parseInt(searchParams.get('page') ?? '0', 10);
+  const rowsPerPage = parseInt(searchParams.get('rows') ?? '25', 10);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
+  const setParam = (key: string, value: string) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value) { next.set(key, value); } else { next.delete(key); }
+      next.delete('page');
+      return next;
+    });
+  };
+
+  const setPage = (newPage: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (newPage > 0) { next.set('page', String(newPage)); } else { next.delete('page'); }
+      return next;
+    });
+  };
+
+  const setRowsPerPage = (rows: number) => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (rows !== 25) { next.set('rows', String(rows)); } else { next.delete('rows'); }
+      next.delete('page');
+      return next;
+    });
+  };
+
   const handleSort = (field: SortableField) => {
     const isAsc = orderBy === field && order === 'asc';
-    setOrder(isAsc ? 'desc' : 'asc');
-    setOrderBy(field);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('orderBy', field);
+      next.set('order', isAsc ? 'desc' : 'asc');
+      return next;
+    });
   };
 
   const availableSeries = useMemo(() => {
@@ -120,6 +152,8 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           book.title?.toLowerCase().includes(q) ||
           book.internalId?.toLowerCase().includes(q) ||
           book.isbn?.toLowerCase().includes(q) ||
+          book.danacode?.toLowerCase().includes(q) ||
+          (book.danacode ? toShortDanacode(book.danacode).toLowerCase().includes(q) : false) ||
           book.authors?.some(
             (a) =>
               a.firstName?.toLowerCase().includes(q) ||
@@ -174,13 +208,17 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
   }, [filteredAndSortedBooks, page, rowsPerPage]);
 
   const clearFilters = () => {
-    setSearchQuery('');
-    setGenreFilter('');
-    setSubGenreFilter('');
-    setStatusFilter('');
-    setLoanFilter('');
-    setSeriesFilter('');
-    setPage(0);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('search');
+      next.delete('genre');
+      next.delete('subGenre');
+      next.delete('status');
+      next.delete('loan');
+      next.delete('series');
+      next.delete('page');
+      return next;
+    });
   };
 
   const activeFilterCount = [genreFilter, subGenreFilter, statusFilter, loanFilter, seriesFilter].filter(Boolean).length;
@@ -193,7 +231,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         <Select
           value={genreFilter}
           label="ז׳אנר"
-          onChange={(e: SelectChangeEvent) => { setGenreFilter(e.target.value); setPage(0); }}
+          onChange={(e: SelectChangeEvent) => setParam('genre', e.target.value)}
         >
           <MenuItem value="">הכל</MenuItem>
           {GENRES.map((g) => (
@@ -206,7 +244,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         <Select
           value={subGenreFilter}
           label="תת-ז׳אנר"
-          onChange={(e: SelectChangeEvent) => { setSubGenreFilter(e.target.value); setPage(0); }}
+          onChange={(e: SelectChangeEvent) => setParam('subGenre', e.target.value)}
         >
           <MenuItem value="">הכל</MenuItem>
           {SUB_GENRES.map((g) => (
@@ -219,7 +257,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         <Select
           value={statusFilter}
           label="סטטוס קריאה"
-          onChange={(e: SelectChangeEvent) => { setStatusFilter(e.target.value); setPage(0); }}
+          onChange={(e: SelectChangeEvent) => setParam('status', e.target.value)}
         >
           <MenuItem value="">הכל</MenuItem>
           {Object.entries(READING_STATUSES).map(([key, label]) => (
@@ -232,7 +270,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         <Select
           value={seriesFilter}
           label="סדרה"
-          onChange={(e: SelectChangeEvent) => { setSeriesFilter(e.target.value); setPage(0); }}
+          onChange={(e: SelectChangeEvent) => setParam('series', e.target.value)}
         >
           <MenuItem value="">הכל</MenuItem>
           {availableSeries.map((s) => (
@@ -245,7 +283,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
         <Select
           value={loanFilter}
           label="השאלה"
-          onChange={(e: SelectChangeEvent) => { setLoanFilter(e.target.value); setPage(0); }}
+          onChange={(e: SelectChangeEvent) => setParam('loan', e.target.value)}
         >
           <MenuItem value="">הכל</MenuItem>
           <MenuItem value="loaned">מושאל</MenuItem>
@@ -272,7 +310,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
               fullWidth
               placeholder="חיפוש לפי שם ספר, מחבר, ISBN, מספר מזהה, סדרה..."
               value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setPage(0); }}
+              onChange={(e) => setParam('search', e.target.value)}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -281,7 +319,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
                 ),
                 endAdornment: searchQuery ? (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setSearchQuery('')}>
+                    <IconButton size="small" onClick={() => setParam('search', '')}>
                       <ClearIcon />
                     </IconButton>
                   </InputAdornment>
@@ -332,10 +370,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           page={page}
           onPageChange={(_, newPage) => setPage(newPage)}
           rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
+          onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
           rowsPerPageOptions={[10, 25, 50]}
           labelRowsPerPage=""
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} מתוך ${count}`}
@@ -512,10 +547,7 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
           page={page}
           onPageChange={(_, newPage) => setPage(newPage)}
           rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
+          onRowsPerPageChange={(e) => setRowsPerPage(parseInt(e.target.value, 10))}
           rowsPerPageOptions={[10, 25, 50, 100]}
           labelRowsPerPage="שורות בעמוד:"
           labelDisplayedRows={({ from, to, count }) => `${from}-${to} מתוך ${count}`}

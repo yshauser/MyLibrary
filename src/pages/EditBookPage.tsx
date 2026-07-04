@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, type NavigateFunction } from 'react-router-dom';
 import { Box, Typography, Snackbar, Alert, CircularProgress } from '@mui/material';
 import type { Book, BookFormData, Series } from '../types/book';
 import { bookService } from '../services/bookService';
@@ -45,7 +45,7 @@ export default function EditBookPage() {
       console.log('[EditBook] Data:', JSON.stringify(data, null, 2));
       await bookService.updateBook(id, data, user?.email ?? undefined);
       console.log('[EditBook] Update successful');
-      navigate('/', { state: { message: 'הספר עודכן בהצלחה' } });
+      navigate(-1 as Parameters<NavigateFunction>[0]);
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       console.error('[EditBook] Error:', errorMsg);
@@ -80,7 +80,7 @@ export default function EditBookPage() {
       <BookForm
         initialData={book}
         onSubmit={handleSubmit}
-        onCancel={() => navigate('/')}
+        onCancel={() => navigate(-1 as Parameters<NavigateFunction>[0])}
         isLoading={saving}
         existingSeries={existingSeries}
       />

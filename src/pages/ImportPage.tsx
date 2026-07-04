@@ -109,7 +109,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     language: String(row['שפה'] || '').trim() || undefined,
     originalTitle: String(row['שם מקורי'] || '').trim() || undefined,
     originalLanguage: String(row['שפה מקורית'] || '').trim() || undefined,
-    translatedBy: String(row['מתורגם ע״י'] || '').trim() || undefined,
+    translatedBy: String(row['תורגם ע״י'] || '').trim() || undefined,
     translationPublishingYear: translationPublishingYear && !isNaN(translationPublishingYear) ? translationPublishingYear : undefined,
     numberOfPages: numberOfPages && !isNaN(numberOfPages) ? numberOfPages : undefined,
     weight: weight && !isNaN(weight) ? weight : undefined,
