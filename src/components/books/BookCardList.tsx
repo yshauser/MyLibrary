@@ -138,7 +138,7 @@ function BookCard({ book, onDelete, onLoan }: BookCardProps) {
 
         {/* Right side: expand icon + admin menu */}
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', ml: 0.5 }}>
-          <IconButton size="small" onClick={() => setExpanded((v) => !v)}>
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}>
             {expanded ? <KeyboardArrowUp /> : <KeyboardArrowDown />}
           </IconButton>
           {isAdmin && (

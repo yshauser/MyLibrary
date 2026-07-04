@@ -1,5 +1,17 @@
-import axios from "axios";
-import * as cheerio from "cheerio";
+// Lazy-load heavy dependencies to avoid deployment introspection timeout.
+// They are only required at invocation time, not at module-load time.
+let _axios: typeof import("axios").default;
+let _cheerio: typeof import("cheerio");
+
+function getAxios() {
+  if (!_axios) _axios = require("axios").default || require("axios");
+  return _axios;
+}
+
+function getCheerio() {
+  if (!_cheerio) _cheerio = require("cheerio");
+  return _cheerio;
+}
 
 /**
  * Book data returned by the scraper.
@@ -81,12 +93,12 @@ async function scrapeFromBookme(
   const suggestUrl = `https://www.bookme.co.il/search-suggestions?word=${encodeURIComponent(shortCode)}`;
   console.log(`[Bookme] Searching: ${suggestUrl}`);
 
-  const suggestResponse = await axios.get<string>(suggestUrl, {
+  const suggestResponse = await getAxios().get<string>(suggestUrl, {
     headers: { "User-Agent": USER_AGENT },
     timeout: REQUEST_TIMEOUT,
   });
 
-  const $suggest = cheerio.load(suggestResponse.data);
+  const $suggest = getCheerio().load(suggestResponse.data);
   const firstLink = $suggest("a").first().attr("href");
 
   if (!firstLink) {
@@ -100,12 +112,12 @@ async function scrapeFromBookme(
 
   console.log(`[Bookme] Found product page: ${productUrl}`);
 
-  const productResponse = await axios.get<string>(productUrl, {
+  const productResponse = await getAxios().get<string>(productUrl, {
     headers: { "User-Agent": USER_AGENT },
     timeout: REQUEST_TIMEOUT,
   });
 
-  const $ = cheerio.load(productResponse.data);
+  const $ = getCheerio().load(productResponse.data);
   const result: ScrapedBookData = {};
 
   // --- Title (from H1) ---
@@ -171,6 +183,11 @@ async function scrapeFromBookme(
     result.language = labelMap["שפה"];
   }
 
+  // --- ISBN ---
+  if (labelMap["ISBN"]) {
+    result.isbn = labelMap["ISBN"].trim();
+  }
+
   // Check we extracted something useful
   if (!result.title && !result.authors) {
     console.log("[Bookme] Could not extract book data");
@@ -221,7 +238,7 @@ async function enrichFromSimania(
   const searchUrl = `https://simania.co.il/api/search?query=${encodeURIComponent(partial.title)}`;
   console.log(`[Simania] Enriching with title search: ${searchUrl}`);
 
-  const response = await axios.get<SimaniaSearchResponse>(searchUrl, {
+  const response = await getAxios().get<SimaniaSearchResponse>(searchUrl, {
     headers: { "User-Agent": USER_AGENT },
     timeout: REQUEST_TIMEOUT,
   });
@@ -261,6 +278,9 @@ async function enrichFromSimania(
       ? match.imageLink
       : `https://simania.co.il${match.imageLink}`;
   }
+  if (!partial.isbn && match.ISBN) {
+    partial.isbn = match.ISBN;
+  }
 
   return partial;
 }
@@ -296,7 +316,7 @@ async function scrapeFromOpus(
 
     let html: string;
     try {
-      const response = await axios.get<string>(url, {
+      const response = await getAxios().get<string>(url, {
         headers: {"User-Agent": USER_AGENT},
         timeout: REQUEST_TIMEOUT,
       });
@@ -306,7 +326,7 @@ async function scrapeFromOpus(
       continue;
     }
 
-    const $ = cheerio.load(html);
+    const $ = getCheerio().load(html);
 
     // Check if this is a valid book page (has an H1 with a title)
     const h1 = $("h1").first().text().trim();
@@ -367,14 +387,13 @@ async function scrapeFromOpus(
       result.translatedBy = labelMap[transKey];
     }
 
-    // --- ISBN / Danacode (labeled as מסת"ב on Opus) ---
+    // --- ISBN (labeled as מסת"ב or ISBN on Opus) ---
     const isbnKey = Object.keys(labelMap).find(
       (k) => k === 'מסת"ב' || k === "מסת״ב" || k === "ISBN"
     );
     if (isbnKey) {
-      // Opus stores the danacode under the מסת"ב label
       const val = labelMap[isbnKey].trim();
-      if (val) result.publishedYear = undefined; // don't overwrite — handled above
+      if (val) result.isbn = val;
     }
 
     // --- Author (from breadcrumb or contributor link) ---
@@ -434,7 +453,7 @@ async function scrapeFromYbook(
 
   let html: string;
   try {
-    const response = await axios.get<string>(url, {
+    const response = await getAxios().get<string>(url, {
       headers: {"User-Agent": USER_AGENT},
       timeout: REQUEST_TIMEOUT,
     });
@@ -444,7 +463,7 @@ async function scrapeFromYbook(
     return null;
   }
 
-  const $ = cheerio.load(html);
+  const $ = getCheerio().load(html);
 
   // Check for a valid product page (H1 with book title)
   const h1 = $("h1").first().text().trim();
@@ -589,6 +608,7 @@ export async function fetchBookByDanacode(
         if (!result.authors && opusData.authors) result.authors = opusData.authors;
         if (!result.title && opusData.title) result.title = opusData.title;
         if (!result.publishingHouse && opusData.publishingHouse) result.publishingHouse = opusData.publishingHouse;
+        if (!result.isbn && opusData.isbn) result.isbn = opusData.isbn;
       }
     }
   } catch (err) {
