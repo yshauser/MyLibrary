@@ -82,11 +82,15 @@ async function scrapeFromBookme(danacode) {
   if (h1) result.title = h1;
 
   // --- Cover Image (from OG meta tag) ---
+  const BOOKME_PLACEHOLDER = 'https://www.bookme.co.il//images/site/book.jpg';
   const ogImage = $('meta[property="og:image"]').attr('content');
   if (ogImage) {
-    result.coverImageUrl = ogImage.startsWith('http')
+    const fullImage = ogImage.startsWith('http')
       ? ogImage
       : `https://www.bookme.co.il${ogImage}`;
+    if (fullImage !== BOOKME_PLACEHOLDER) {
+      result.coverImageUrl = fullImage;
+    }
   }
 
   // --- Extract labeled fields ---

@@ -39,6 +39,7 @@ interface ParsedRow {
   translationPublishingYear?: number;
   numberOfPages?: number;
   weight?: number;
+  coverImageUrl?: string;
   seriesName?: string;
   volumeNumber?: number;
   volumePart?: string;
@@ -122,6 +123,7 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     physicalLocation: String(row['מיקום פיזי'] || '').trim() || undefined,
     readingStatus: String(row['סטטוס קריאה'] || '').trim() || undefined,
     personalRating: personalRating && !isNaN(personalRating) ? personalRating : undefined,
+    coverImageUrl: String(row['תמונת כריכה'] || '').trim() || undefined,
     valid: errors.length === 0,
     errors,
   };
@@ -154,6 +156,7 @@ function parsedRowToBookFormData(row: ParsedRow): BookFormData {
   if (row.physicalLocation) data.physicalLocation = row.physicalLocation;
   if (row.readingStatus) data.readingStatus = row.readingStatus as BookFormData['readingStatus'];
   if (row.personalRating) data.personalRating = row.personalRating;
+  if (row.coverImageUrl) data.coverImageUrl = row.coverImageUrl;
 
   if (row.seriesName) {
     const series: Record<string, unknown> = { name: row.seriesName };

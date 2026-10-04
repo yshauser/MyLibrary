@@ -45,6 +45,7 @@ function flattenBook(book: Book) {
     'מיקום פיזי': book.physicalLocation || '',
     'סטטוס קריאה': book.readingStatus || '',
     'דירוג': book.personalRating || '',
+    'תמונת כריכה': book.coverImageUrl || '',
     'מושאל ל': book.currentLoan?.loanerName || '',
   };
 }
