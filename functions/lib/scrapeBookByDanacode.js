@@ -1,44 +1,20 @@
 "use strict";
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchBookByDanacode = fetchBookByDanacode;
-const axios_1 = __importDefault(require("axios"));
-const cheerio = __importStar(require("cheerio"));
+// Lazy-load heavy dependencies to avoid deployment introspection timeout.
+// They are only required at invocation time, not at module-load time.
+let _axios;
+let _cheerio;
+function getAxios() {
+    if (!_axios)
+        _axios = require("axios").default || require("axios");
+    return _axios;
+}
+function getCheerio() {
+    if (!_cheerio)
+        _cheerio = require("cheerio");
+    return _cheerio;
+}
 const USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 const REQUEST_TIMEOUT = 10_000;
 /**
@@ -87,11 +63,11 @@ async function scrapeFromBookme(danacode) {
     const shortCode = normalizeDanacodeForSearch(danacode);
     const suggestUrl = `https://www.bookme.co.il/search-suggestions?word=${encodeURIComponent(shortCode)}`;
     console.log(`[Bookme] Searching: ${suggestUrl}`);
-    const suggestResponse = await axios_1.default.get(suggestUrl, {
+    const suggestResponse = await getAxios().get(suggestUrl, {
         headers: { "User-Agent": USER_AGENT },
         timeout: REQUEST_TIMEOUT,
     });
-    const $suggest = cheerio.load(suggestResponse.data);
+    const $suggest = getCheerio().load(suggestResponse.data);
     const firstLink = $suggest("a").first().attr("href");
     if (!firstLink) {
         console.log("[Bookme] No results in search suggestions");
@@ -101,22 +77,26 @@ async function scrapeFromBookme(danacode) {
         ? firstLink
         : `https://www.bookme.co.il${firstLink}`;
     console.log(`[Bookme] Found product page: ${productUrl}`);
-    const productResponse = await axios_1.default.get(productUrl, {
+    const productResponse = await getAxios().get(productUrl, {
         headers: { "User-Agent": USER_AGENT },
         timeout: REQUEST_TIMEOUT,
     });
-    const $ = cheerio.load(productResponse.data);
+    const $ = getCheerio().load(productResponse.data);
     const result = {};
     // --- Title (from H1) ---
     const h1 = $("h1").first().text().trim();
     if (h1)
         result.title = h1;
     // --- Cover Image (from OG meta tag) ---
+    // URLs ending with "book.jpg" are generic placeholders — treat as no image found.
     const ogImage = $('meta[property="og:image"]').attr("content");
     if (ogImage) {
-        result.coverImageUrl = ogImage.startsWith("http")
+        const fullImage = ogImage.startsWith("http")
             ? ogImage
             : `https://www.bookme.co.il${ogImage}`;
+        if (!fullImage.endsWith("book.jpg")) {
+            result.coverImageUrl = fullImage;
+        }
     }
     // --- Extract labeled fields from spans/divs ---
     // Bookme uses elements like: <span>שם המחבר:</span> <span>Name</span>
@@ -161,6 +141,10 @@ async function scrapeFromBookme(danacode) {
     if (labelMap["שפה"]) {
         result.language = labelMap["שפה"];
     }
+    // --- ISBN ---
+    if (labelMap["ISBN"]) {
+        result.isbn = labelMap["ISBN"].trim();
+    }
     // Check we extracted something useful
     if (!result.title && !result.authors) {
         console.log("[Bookme] Could not extract book data");
@@ -179,7 +163,7 @@ async function enrichFromSimania(partial) {
         return partial;
     const searchUrl = `https://simania.co.il/api/search?query=${encodeURIComponent(partial.title)}`;
     console.log(`[Simania] Enriching with title search: ${searchUrl}`);
-    const response = await axios_1.default.get(searchUrl, {
+    const response = await getAxios().get(searchUrl, {
         headers: { "User-Agent": USER_AGENT },
         timeout: REQUEST_TIMEOUT,
     });
@@ -212,6 +196,9 @@ async function enrichFromSimania(partial) {
             ? match.imageLink
             : `https://simania.co.il${match.imageLink}`;
     }
+    if (!partial.isbn && match.ISBN) {
+        partial.isbn = match.ISBN;
+    }
     return partial;
 }
 // ─── Opus.co.il Scraper ─────────────────────────────────────────────
@@ -239,7 +226,7 @@ async function scrapeFromOpus(danacode) {
         console.log(`[Opus] Trying: ${url}`);
         let html;
         try {
-            const response = await axios_1.default.get(url, {
+            const response = await getAxios().get(url, {
                 headers: { "User-Agent": USER_AGENT },
                 timeout: REQUEST_TIMEOUT,
             });
@@ -249,7 +236,7 @@ async function scrapeFromOpus(danacode) {
             console.log(`[Opus] Request failed for catnum=${catnum}:`, err instanceof Error ? err.message : err);
             continue;
         }
-        const $ = cheerio.load(html);
+        const $ = getCheerio().load(html);
         // Check if this is a valid book page (has an H1 with a title)
         const h1 = $("h1").first().text().trim();
         if (!h1) {
@@ -301,13 +288,12 @@ async function scrapeFromOpus(danacode) {
         if (transKey) {
             result.translatedBy = labelMap[transKey];
         }
-        // --- ISBN / Danacode (labeled as מסת"ב on Opus) ---
+        // --- ISBN (labeled as מסת"ב or ISBN on Opus) ---
         const isbnKey = Object.keys(labelMap).find((k) => k === 'מסת"ב' || k === "מסת״ב" || k === "ISBN");
         if (isbnKey) {
-            // Opus stores the danacode under the מסת"ב label
             const val = labelMap[isbnKey].trim();
             if (val)
-                result.publishedYear = undefined; // don't overwrite — handled above
+                result.isbn = val;
         }
         // --- Author (from breadcrumb or contributor link) ---
         const authorLink = $('a[href*="showcontrib"]').first().text().trim();
@@ -356,7 +342,7 @@ async function scrapeFromYbook(danacode) {
     console.log(`[Ybook] Trying: ${url}`);
     let html;
     try {
-        const response = await axios_1.default.get(url, {
+        const response = await getAxios().get(url, {
             headers: { "User-Agent": USER_AGENT },
             timeout: REQUEST_TIMEOUT,
         });
@@ -366,7 +352,7 @@ async function scrapeFromYbook(danacode) {
         console.log(`[Ybook] Request failed:`, err instanceof Error ? err.message : err);
         return null;
     }
-    const $ = cheerio.load(html);
+    const $ = getCheerio().load(html);
     // Check for a valid product page (H1 with book title)
     const h1 = $("h1").first().text().trim();
     if (!h1) {
@@ -502,6 +488,8 @@ async function fetchBookByDanacode(danacode) {
                     result.title = opusData.title;
                 if (!result.publishingHouse && opusData.publishingHouse)
                     result.publishingHouse = opusData.publishingHouse;
+                if (!result.isbn && opusData.isbn)
+                    result.isbn = opusData.isbn;
             }
         }
     }

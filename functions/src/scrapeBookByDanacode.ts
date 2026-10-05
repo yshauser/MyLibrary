@@ -125,13 +125,13 @@ async function scrapeFromBookme(
   if (h1) result.title = h1;
 
   // --- Cover Image (from OG meta tag) ---
-  const BOOKME_PLACEHOLDER = "https://www.bookme.co.il//images/site/book.jpg";
+  // URLs ending with "book.jpg" are generic placeholders — treat as no image found.
   const ogImage = $('meta[property="og:image"]').attr("content");
   if (ogImage) {
     const fullImage = ogImage.startsWith("http")
       ? ogImage
       : `https://www.bookme.co.il${ogImage}`;
-    if (fullImage !== BOOKME_PLACEHOLDER) {
+    if (!fullImage.endsWith("book.jpg")) {
       result.coverImageUrl = fullImage;
     }
   }
