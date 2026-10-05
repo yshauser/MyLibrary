@@ -1,8 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchBookByDanacode = fetchBookByDanacode;
-// Lazy-load heavy dependencies to avoid deployment introspection timeout.
-// They are only required at invocation time, not at module-load time.
 let _axios;
 let _cheerio;
 function getAxios() {

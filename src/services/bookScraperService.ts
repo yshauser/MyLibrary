@@ -35,6 +35,12 @@ export async function fetchBookByDanacode(
     if (!json.data) return null;
 
     const data = json.data as GoogleBookData;
+
+    // Clear placeholder cover images returned by bookme
+    if (data.coverImageUrl?.endsWith('book.jpg')) {
+      data.coverImageUrl = '';
+    }
+
     return data;
   } catch (err) {
     console.error('Book scraper error:', err);

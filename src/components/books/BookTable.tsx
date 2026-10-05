@@ -146,21 +146,22 @@ export default function BookTable({ books, onDelete, onLoan }: BookTableProps) {
     let filtered = [...books];
 
     if (searchQuery) {
-      const q = searchQuery.trim().toLowerCase();
-      filtered = filtered.filter(
-        (book) =>
-          book.title?.toLowerCase().includes(q) ||
-          book.internalId?.toLowerCase().includes(q) ||
-          book.isbn?.toLowerCase().includes(q) ||
-          book.danacode?.toLowerCase().includes(q) ||
-          (book.danacode ? toShortDanacode(book.danacode).toLowerCase().includes(q) : false) ||
-          book.authors?.some(
-            (a) =>
-              a.firstName?.toLowerCase().includes(q) ||
-              a.lastName?.toLowerCase().includes(q)
-          ) ||
-          book.series?.name?.toLowerCase().includes(q)
-      );
+      const words = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      filtered = filtered.filter((book) => {
+        const searchableText = [
+          book.title,
+          book.internalId,
+          book.isbn,
+          book.danacode,
+          book.danacode ? toShortDanacode(book.danacode) : '',
+          ...(book.authors?.flatMap((a) => [a.firstName, a.lastName]) ?? []),
+          book.series?.name,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase();
+        return words.every((word) => searchableText.includes(word));
+      });
     }
 
     if (genreFilter) {

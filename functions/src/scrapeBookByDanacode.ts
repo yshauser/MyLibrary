@@ -1,7 +1,9 @@
 // Lazy-load heavy dependencies to avoid deployment introspection timeout.
 // They are only required at invocation time, not at module-load time.
-let _axios: typeof import("axios").default;
-let _cheerio: typeof import("cheerio");
+import type { AxiosStatic } from "axios";
+import type * as Cheerio from "cheerio";
+let _axios: AxiosStatic;
+let _cheerio: typeof Cheerio;
 
 function getAxios() {
   if (!_axios) _axios = require("axios").default || require("axios");
@@ -256,7 +258,7 @@ async function enrichFromSimania(
   const books = response.data.data.books;
   const match =
     books.find(
-      (b) => b.NAME.trim() === partial.title?.trim()
+      (b: SimaniaBook) => b.NAME.trim() === partial.title?.trim()
     ) || books[0];
 
   console.log(`[Simania] Matched: "${match.NAME}" by ${match.AUTHOR}`);
