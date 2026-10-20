@@ -184,6 +184,18 @@ export const bookService = {
     return map;
   },
 
+  async findBooksByInternalIdsWithData(internalIds: string[]): Promise<Map<string, Book>> {
+    const map = new Map<string, Book>();
+    const snapshot = await getDocs(booksRef);
+    for (const docSnap of snapshot.docs) {
+      const data = docSnap.data();
+      if (data.internalId && internalIds.includes(data.internalId)) {
+        map.set(data.internalId, { id: docSnap.id, ...data } as Book);
+      }
+    }
+    return map;
+  },
+
   async batchUpsertBooks(books: BookFormData[]): Promise<{ added: number; updated: number }> {
     console.log(`[BookService] batchUpsertBooks called with ${books.length} books`);
     const internalIds = books

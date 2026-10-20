@@ -14,12 +14,29 @@ import {
   LinearProgress,
   Chip,
   Stack,
+  Collapse,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
-import { FileUpload as UploadIcon, Save as SaveIcon, Download as DownloadIcon, Cancel as CancelIcon } from '@mui/icons-material';
+import {
+  FileUpload as UploadIcon,
+  Save as SaveIcon,
+  Download as DownloadIcon,
+  Cancel as CancelIcon,
+  KeyboardArrowDown as ExpandIcon,
+  KeyboardArrowUp as CollapseIcon,
+} from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import { Timestamp } from 'firebase/firestore';
-import type { BookFormData, Author } from '../types/book';
+import type { Book, BookFormData, Author } from '../types/book';
 import { bookService } from '../services/bookService';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ParsedRow {
   internalId: string;
@@ -53,16 +70,52 @@ interface ParsedRow {
   errors: string[];
 }
 
+type RowStatus = 'new' | 'changed' | 'unchanged';
+
+interface ComparedRow {
+  parsed: ParsedRow;
+  status: RowStatus;
+  changedFields: string[];
+  existingBook?: Book;
+  selected: boolean;
+}
+
+// ─── Field label map (for human-readable diff display) ───────────────────────
+
+const FIELD_LABELS: Record<string, string> = {
+  title: 'שם הספר',
+  originalTitle: 'שם מקורי',
+  authors: 'מחברים',
+  language: 'שפה',
+  originalLanguage: 'שפה מקורית',
+  isbn: 'ISBN',
+  danacode: 'דאנאקוד',
+  publishedYear: 'שנת הוצאה',
+  translatedBy: 'תורגם ע״י',
+  translationPublishingYear: 'שנת תרגום',
+  publishingHouse: 'הוצאה לאור',
+  edition: 'מהדורה',
+  numberOfPages: 'מספר עמודים',
+  weight: 'משקל',
+  coverImageUrl: 'תמונת כריכה',
+  genres: 'ז׳אנרים',
+  subGenres: 'תת-ז׳אנרים',
+  comments: 'הערות',
+  physicalLocation: 'מיקום פיזי',
+  readingStatus: 'סטטוס קריאה',
+  personalRating: 'דירוג',
+  series: 'סדרה',
+};
+
+// ─── Parse helpers ────────────────────────────────────────────────────────────
+
 function parseAuthors(firstNames: string, lastNames: string): Author[] {
   const fNames = firstNames ? firstNames.split(';').map((s) => s.trim()) : [''];
   const lNames = lastNames ? lastNames.split(';').map((s) => s.trim()) : [''];
   const max = Math.max(fNames.length, lNames.length);
   const authors: Author[] = [];
   for (let i = 0; i < max; i++) {
-    authors.push({
-      firstName: fNames[i] || '',
-      lastName: lNames[i] || '',
-    });
+    authors.push({ firstName: fNames[i] || '', lastName: lNames[i] || '' });
   }
   return authors;
 }
@@ -78,11 +131,9 @@ function parseRow(row: Record<string, unknown>): ParsedRow {
     String(row['מחבר - שם פרטי'] || ''),
     String(row['מחבר - שם משפחה'] || '')
   );
-
   const genres = row['ז׳אנרים']
     ? String(row['ז׳אנרים']).split(';').map((s) => s.trim()).filter(Boolean)
     : [];
-
   const subGenres = row['תת-ז׳אנרים']
     ? String(row['תת-ז׳אנרים']).split(';').map((s) => s.trim()).filter(Boolean)
     : [];
@@ -170,13 +221,173 @@ function parsedRowToBookFormData(row: ParsedRow): BookFormData {
   return data;
 }
 
+// ─── Diff logic ───────────────────────────────────────────────────────────────
+
+function authorsEqual(a: Author[], b: Author[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((ai, i) => ai.firstName === b[i].firstName && ai.lastName === b[i].lastName);
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  const sa = [...a].sort();
+  const sb = [...b].sort();
+  return sa.every((v, i) => v === sb[i]);
+}
+
+function findChangedFields(parsed: ParsedRow, existing: Book): string[] {
+  const changed: string[] = [];
+
+  const strChanged = (a: string | undefined, b: string | undefined) =>
+    (a || '') !== (b || '');
+  const numChanged = (a: number | undefined, b: number | undefined) =>
+    (a ?? '') !== (b ?? '');
+
+  if (strChanged(parsed.title, existing.title)) changed.push('title');
+  if (strChanged(parsed.originalTitle, existing.originalTitle)) changed.push('originalTitle');
+  if (!authorsEqual(parsed.authors, existing.authors ?? [])) changed.push('authors');
+  if (strChanged(parsed.language, existing.language)) changed.push('language');
+  if (strChanged(parsed.originalLanguage, existing.originalLanguage)) changed.push('originalLanguage');
+  if (strChanged(parsed.isbn, existing.isbn)) changed.push('isbn');
+  if (strChanged(parsed.danacode, existing.danacode)) changed.push('danacode');
+  if (numChanged(parsed.publishedYear, existing.publishedYear)) changed.push('publishedYear');
+  if (strChanged(parsed.translatedBy, existing.translatedBy)) changed.push('translatedBy');
+  if (numChanged(parsed.translationPublishingYear, existing.translationPublishingYear)) changed.push('translationPublishingYear');
+  if (strChanged(parsed.publishingHouse, existing.publishingHouse)) changed.push('publishingHouse');
+  if (strChanged(parsed.edition, existing.edition)) changed.push('edition');
+  if (numChanged(parsed.numberOfPages, existing.numberOfPages)) changed.push('numberOfPages');
+  if (numChanged(parsed.weight, existing.weight)) changed.push('weight');
+  if (strChanged(parsed.coverImageUrl, existing.coverImageUrl)) changed.push('coverImageUrl');
+  if (!arraysEqual(parsed.genres, existing.genres ?? [])) changed.push('genres');
+  if (!arraysEqual(parsed.subGenres, existing.subGenres ?? [])) changed.push('subGenres');
+  if (strChanged(parsed.comments, existing.comments)) changed.push('comments');
+  if (strChanged(parsed.physicalLocation, existing.physicalLocation)) changed.push('physicalLocation');
+  if (strChanged(parsed.readingStatus, existing.readingStatus)) changed.push('readingStatus');
+  if (numChanged(parsed.personalRating, existing.personalRating)) changed.push('personalRating');
+
+  // Series comparison
+  const parsedSeriesName = parsed.seriesName || '';
+  const existingSeriesName = existing.series?.name || '';
+  if (
+    parsedSeriesName !== existingSeriesName ||
+    (parsed.volumeNumber ?? '') !== (existing.series?.volumeNumber ?? '') ||
+    (parsed.volumePart || '') !== (existing.series?.volumePart || '') ||
+    (parsed.totalVolumes ?? '') !== (existing.series?.totalVolumes ?? '') ||
+    (parsed.hasUntranslatedBooks ?? false) !== (existing.series?.hasUntranslatedBooks ?? false)
+  ) {
+    changed.push('series');
+  }
+
+  return changed;
+}
+
+// ─── Expanded diff row component ──────────────────────────────────────────────
+
+function formatValue(field: string, parsed: ParsedRow, existing?: Book): { from: string; to: string } {
+  switch (field) {
+    case 'authors':
+      return {
+        from: (existing?.authors ?? []).map((a) => `${a.firstName} ${a.lastName}`).join('; '),
+        to: parsed.authors.map((a) => `${a.firstName} ${a.lastName}`).join('; '),
+      };
+    case 'genres':
+      return {
+        from: (existing?.genres ?? []).join('; '),
+        to: parsed.genres.join('; '),
+      };
+    case 'subGenres':
+      return {
+        from: (existing?.subGenres ?? []).join('; '),
+        to: parsed.subGenres.join('; '),
+      };
+    case 'series':
+      return {
+        from: existing?.series
+          ? `${existing.series.name}${existing.series.volumeNumber ? ` כרך ${existing.series.volumeNumber}` : ''}`
+          : '',
+        to: parsed.seriesName
+          ? `${parsed.seriesName}${parsed.volumeNumber ? ` כרך ${parsed.volumeNumber}` : ''}`
+          : '',
+      };
+    default: {
+      const parsedVal = (parsed as unknown as Record<string, unknown>)[field];
+      const existingVal = existing ? (existing as unknown as Record<string, unknown>)[field] : undefined;
+      return {
+        from: existingVal != null ? String(existingVal) : '',
+        to: parsedVal != null ? String(parsedVal) : '',
+      };
+    }
+  }
+}
+
+function DiffDetails({ row }: { row: ComparedRow }) {
+  if (row.status === 'new') {
+    return (
+      <Box sx={{ px: 2, pb: 1 }}>
+        <Chip label="ספר חדש — ייווסף למערכת" size="small" color="success" />
+      </Box>
+    );
+  }
+  if (row.status === 'unchanged') {
+    return (
+      <Box sx={{ px: 2, pb: 1 }}>
+        <Chip label="אין שינויים" size="small" variant="outlined" />
+      </Box>
+    );
+  }
+  return (
+    <Box sx={{ px: 2, pb: 1 }}>
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell sx={{ fontWeight: 600, width: '20%' }}>שדה</TableCell>
+            <TableCell sx={{ fontWeight: 600, width: '40%', color: 'error.main' }}>ערך קיים</TableCell>
+            <TableCell sx={{ fontWeight: 600, width: '40%', color: 'success.main' }}>ערך חדש</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {row.changedFields.map((field) => {
+            const { from, to } = formatValue(field, row.parsed, row.existingBook);
+            return (
+              <TableRow key={field}>
+                <TableCell>{FIELD_LABELS[field] ?? field}</TableCell>
+                <TableCell sx={{ color: 'error.dark', textDecoration: 'line-through', opacity: 0.7 }}>
+                  {from || '—'}
+                </TableCell>
+                <TableCell sx={{ color: 'success.dark', fontWeight: 500 }}>
+                  {to || '—'}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Box>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+interface ConfirmDialog {
+  open: boolean;
+  onlySelected: boolean;
+  addCount: number;
+  updateCount: number;
+}
+
 export default function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
+  const [comparedRows, setComparedRows] = useState<ComparedRow[]>([]);
+  const [comparing, setComparing] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
+  const [statusFilter, setStatusFilter] = useState<RowStatus | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmDialog>({ open: false, onlySelected: false, addCount: 0, updateCount: 0 });
   const [result, setResult] = useState<{ added: number; updated: number; errors: number } | null>(null);
   const [error, setError] = useState('');
 
+  // Step 1: parse file (no DB call yet)
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -184,6 +395,9 @@ export default function ImportPage() {
     setError('');
     setResult(null);
     setParsedRows([]);
+    setComparedRows([]);
+    setExpandedRows(new Set());
+    setStatusFilter(null);
 
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -193,7 +407,6 @@ export default function ImportPage() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet) as Record<string, unknown>[];
-
         const parsed = jsonData.map(parseRow);
         setParsedRows(parsed);
       } catch (err) {
@@ -204,37 +417,126 @@ export default function ImportPage() {
     reader.readAsArrayBuffer(file);
   };
 
-  const handleImport = async () => {
+  // Step 2: compare against DB
+  const handleCompare = async () => {
     const validRows = parsedRows.filter((r) => r.valid);
     if (validRows.length === 0) return;
 
-    setImporting(true);
-
+    setComparing(true);
+    setError('');
     try {
-      const booksToImport = validRows.map((row, index) => {
-        const bookData = parsedRowToBookFormData(row);
-        console.log(`[Import] Row ${index + 1}:`, JSON.stringify(bookData, null, 2));
-        return bookData;
+      const internalIds = validRows
+        .map((r) => r.internalId)
+        .filter((id): id is string => !!id);
+
+      const existingMap = internalIds.length > 0
+        ? await bookService.findBooksByInternalIdsWithData(internalIds)
+        : new Map<string, Book>();
+
+      const compared: ComparedRow[] = parsedRows.map((parsed) => {
+        if (!parsed.valid) {
+          return { parsed, status: 'new', changedFields: [], selected: false };
+        }
+        const existing = parsed.internalId ? existingMap.get(parsed.internalId) : undefined;
+        if (!existing) {
+          return { parsed, status: 'new', changedFields: [], existingBook: undefined, selected: true };
+        }
+        const changedFields = findChangedFields(parsed, existing);
+        const status: RowStatus = changedFields.length > 0 ? 'changed' : 'unchanged';
+        return { parsed, status, changedFields, existingBook: existing, selected: status === 'changed' };
       });
-      console.log(`[Import] Sending ${booksToImport.length} books to batchUpsertBooks`);
+
+      setComparedRows(compared);
+    } catch (err) {
+      console.error('Compare error:', err);
+      setError('שגיאה בהשוואה לנתונים הקיימים');
+    } finally {
+      setComparing(false);
+    }
+  };
+
+  // Step 3a: show confirmation dialog
+  const requestImport = (onlySelected: boolean) => {
+    const rowsToImport = comparedRows.filter((r) =>
+      r.parsed.valid && (onlySelected ? r.selected : r.status !== 'unchanged')
+    );
+    if (rowsToImport.length === 0) return;
+    const addCount = rowsToImport.filter((r) => r.status === 'new').length;
+    const updateCount = rowsToImport.filter((r) => r.status === 'changed').length;
+    setConfirmDialog({ open: true, onlySelected, addCount, updateCount });
+  };
+
+  // Step 3b: confirmed — actually import
+  const confirmImport = async () => {
+    const { onlySelected } = confirmDialog;
+    setConfirmDialog((prev) => ({ ...prev, open: false }));
+
+    const rowsToImport = comparedRows.filter((r) =>
+      r.parsed.valid && (onlySelected ? r.selected : r.status !== 'unchanged')
+    );
+    if (rowsToImport.length === 0) return;
+
+    setImporting(true);
+    try {
+      const booksToImport = rowsToImport.map((r) => parsedRowToBookFormData(r.parsed));
       const { added, updated } = await bookService.batchUpsertBooks(booksToImport);
-      console.log(`[Import] Success: added=${added}, updated=${updated}`);
-      setResult({ added, updated, errors: parsedRows.length - validRows.length });
+      setResult({ added, updated, errors: parsedRows.filter((r) => !r.valid).length });
       setParsedRows([]);
+      setComparedRows([]);
+      setExpandedRows(new Set());
+      setStatusFilter(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
-      const errorStack = err instanceof Error ? err.stack : '';
-      console.error('[Import] Error:', errorMsg);
-      console.error('[Import] Stack:', errorStack);
-      console.error('[Import] Full error object:', err);
       setError(`שגיאה בייבוא: ${errorMsg}`);
     } finally {
       setImporting(false);
     }
   };
 
+  const toggleStatusFilter = (status: RowStatus) => {
+    setStatusFilter((prev) => (prev === status ? null : status));
+  };
+
+  const toggleRowExpanded = (index: number) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(index)) next.delete(index);
+      else next.add(index);
+      return next;
+    });
+  };
+
+  const toggleRowSelected = (index: number) => {
+    setComparedRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, selected: !r.selected } : r))
+    );
+  };
+
   const validCount = parsedRows.filter((r) => r.valid).length;
   const invalidCount = parsedRows.filter((r) => !r.valid).length;
+
+  const newCount = comparedRows.filter((r) => r.status === 'new' && r.parsed.valid).length;
+  const changedCount = comparedRows.filter((r) => r.status === 'changed').length;
+  const unchangedCount = comparedRows.filter((r) => r.status === 'unchanged').length;
+  const selectedCount = comparedRows.filter((r) => r.selected && r.parsed.valid).length;
+
+  const visibleRows = statusFilter
+    ? comparedRows.filter((r) => r.status === statusFilter)
+    : comparedRows;
+
+  const statusChip = (status: RowStatus) => {
+    if (status === 'new') return <Chip label="חדש" size="small" color="success" />;
+    if (status === 'changed') return <Chip label="שונה" size="small" color="warning" />;
+    return <Chip label="ללא שינוי" size="small" variant="outlined" />;
+  };
+
+  const rowBgColor = (row: ComparedRow) => {
+    if (!row.parsed.valid) return 'error.light';
+    if (row.status === 'new') return 'success.50';
+    if (row.status === 'changed') return 'warning.50';
+    return undefined;
+  };
 
   return (
     <Box>
@@ -242,6 +544,7 @@ export default function ImportPage() {
         ייבוא ספרים
       </Typography>
 
+      {/* ── Upload panel ── */}
       <Paper sx={{ p: 3, mb: 3 }}>
         <Typography variant="body1" gutterBottom>
           העלה קובץ Excel או CSV עם נתוני הספרים. הקובץ צריך לכלול עמודות בפורמט הייצוא.
@@ -280,47 +583,48 @@ export default function ImportPage() {
       </Paper>
 
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+
       {result && (
         <Alert severity="success" sx={{ mb: 2 }}>
-          הייבוא הושלם: {result.added > 0 && `${result.added} ספרים חדשים נוספו`}
+          הייבוא הושלם:{' '}
+          {result.added > 0 && `${result.added} ספרים חדשים נוספו`}
           {result.added > 0 && result.updated > 0 && ', '}
           {result.updated > 0 && `${result.updated} ספרים עודכנו`}
           {result.errors > 0 && `, ${result.errors} שורות נדלגו בגלל שגיאות`}
         </Alert>
       )}
 
-      {parsedRows.length > 0 && (
-        <>
-          <Paper sx={{ p: 2, mb: 2 }}>
-            <Stack direction="row" spacing={2} alignItems="center">
-              <Chip label={`${validCount} תקינים`} color="success" />
-              {invalidCount > 0 && <Chip label={`${invalidCount} שגויים`} color="error" />}
-              <Typography variant="body2" color="text.secondary">
-                סה״כ {parsedRows.length} שורות
-              </Typography>
-              <Box sx={{ flexGrow: 1 }} />
-              <Button
-                variant="outlined"
-                color="inherit"
-                startIcon={<CancelIcon />}
-                onClick={() => { setParsedRows([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                disabled={importing}
-              >
-                ביטול
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={handleImport}
-                disabled={importing || validCount === 0}
-              >
-                {importing ? 'מייבא...' : `ייבא ${validCount} ספרים`}
-              </Button>
-            </Stack>
-            {importing && <LinearProgress sx={{ mt: 2 }} />}
-          </Paper>
+      {/* ── Step 1: File parsed — show summary & Compare button ── */}
+      {parsedRows.length > 0 && comparedRows.length === 0 && (
+        <Paper sx={{ p: 2, mb: 2 }}>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Chip label={`${validCount} תקינים`} color="success" />
+            {invalidCount > 0 && <Chip label={`${invalidCount} שגויים`} color="error" />}
+            <Typography variant="body2" color="text.secondary">
+              סה״כ {parsedRows.length} שורות
+            </Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <Button
+              variant="outlined"
+              color="inherit"
+              startIcon={<CancelIcon />}
+              onClick={() => { setParsedRows([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+              disabled={comparing}
+            >
+              ביטול
+            </Button>
+            <Button
+              variant="contained"
+              onClick={handleCompare}
+              disabled={comparing || validCount === 0}
+            >
+              {comparing ? 'משווה...' : 'השווה לנתונים הקיימים'}
+            </Button>
+          </Stack>
+          {comparing && <LinearProgress sx={{ mt: 2 }} />}
 
-          <TableContainer component={Paper} sx={{ maxHeight: 400 }}>
+          {/* Basic validation table */}
+          <TableContainer sx={{ mt: 2, maxHeight: 300 }}>
             <Table size="small" stickyHeader>
               <TableHead>
                 <TableRow>
@@ -328,34 +632,21 @@ export default function ImportPage() {
                   <TableCell>מס׳ מזהה</TableCell>
                   <TableCell>שם הספר</TableCell>
                   <TableCell>מחבר</TableCell>
-                  <TableCell>ז׳אנר</TableCell>
                   <TableCell>שגיאות</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {parsedRows.map((row, index) => (
-                  <TableRow
-                    key={index}
-                    sx={{ bgcolor: row.valid ? undefined : 'error.light' }}
-                  >
+                  <TableRow key={index} sx={{ bgcolor: row.valid ? undefined : 'error.light' }}>
                     <TableCell>
-                      <Chip
-                        label={row.valid ? '✓' : '✗'}
-                        size="small"
-                        color={row.valid ? 'success' : 'error'}
-                      />
+                      <Chip label={row.valid ? '✓' : '✗'} size="small" color={row.valid ? 'success' : 'error'} />
                     </TableCell>
                     <TableCell>{row.internalId}</TableCell>
                     <TableCell>{row.title}</TableCell>
-                    <TableCell>
-                      {row.authors.map((a) => `${a.firstName} ${a.lastName}`).join(', ')}
-                    </TableCell>
-                    <TableCell>{row.genres.join(', ')}</TableCell>
+                    <TableCell>{row.authors.map((a) => `${a.firstName} ${a.lastName}`).join(', ')}</TableCell>
                     <TableCell>
                       {row.errors.map((err, i) => (
-                        <Typography key={i} variant="caption" color="error">
-                          {err}
-                        </Typography>
+                        <Typography key={i} variant="caption" color="error">{err}</Typography>
                       ))}
                     </TableCell>
                   </TableRow>
@@ -363,8 +654,207 @@ export default function ImportPage() {
               </TableBody>
             </Table>
           </TableContainer>
+        </Paper>
+      )}
+
+      {/* ── Step 2: Compared results ── */}
+      {comparedRows.length > 0 && (
+        <>
+          <Paper sx={{ p: 2, mb: 2 }}>
+            {/* Summary chips — clickable to filter */}
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+              <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                סנן:
+              </Typography>
+              {newCount > 0 && (
+                <Tooltip title={statusFilter === 'new' ? 'הצג הכל' : 'הצג רק חדשים'}>
+                  <Chip
+                    label={`${newCount} חדשים`}
+                    color="success"
+                    onClick={() => toggleStatusFilter('new')}
+                    variant={statusFilter === 'new' ? 'filled' : 'outlined'}
+                    sx={{ cursor: 'pointer', fontWeight: statusFilter === 'new' ? 700 : 400 }}
+                  />
+                </Tooltip>
+              )}
+              {changedCount > 0 && (
+                <Tooltip title={statusFilter === 'changed' ? 'הצג הכל' : 'הצג רק שונים'}>
+                  <Chip
+                    label={`${changedCount} שונו`}
+                    color="warning"
+                    onClick={() => toggleStatusFilter('changed')}
+                    variant={statusFilter === 'changed' ? 'filled' : 'outlined'}
+                    sx={{ cursor: 'pointer', fontWeight: statusFilter === 'changed' ? 700 : 400 }}
+                  />
+                </Tooltip>
+              )}
+              {unchangedCount > 0 && (
+                <Tooltip title={statusFilter === 'unchanged' ? 'הצג הכל' : 'הצג רק ללא שינוי'}>
+                  <Chip
+                    label={`${unchangedCount} ללא שינוי`}
+                    onClick={() => toggleStatusFilter('unchanged')}
+                    variant={statusFilter === 'unchanged' ? 'filled' : 'outlined'}
+                    sx={{ cursor: 'pointer', fontWeight: statusFilter === 'unchanged' ? 700 : 400 }}
+                  />
+                </Tooltip>
+              )}
+              {invalidCount > 0 && <Chip label={`${invalidCount} שגויים`} color="error" />}
+              {statusFilter && (
+                <Button size="small" onClick={() => setStatusFilter(null)} sx={{ ml: 1 }}>
+                  הצג הכל
+                </Button>
+              )}
+            </Stack>
+
+            {/* Action buttons */}
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Box sx={{ flexGrow: 1 }} />
+              <Button
+                variant="outlined"
+                color="inherit"
+                startIcon={<CancelIcon />}
+                onClick={() => {
+                  setParsedRows([]);
+                  setComparedRows([]);
+                  setExpandedRows(new Set());
+                  setStatusFilter(null);
+                  if (fileInputRef.current) fileInputRef.current.value = '';
+                }}
+                disabled={importing}
+              >
+                ביטול
+              </Button>
+              <Tooltip title={`ייבא רק את ${selectedCount} הרשומות המסומנות`}>
+                <span>
+                  <Button
+                    variant="outlined"
+                    color="primary"
+                    startIcon={<SaveIcon />}
+                    onClick={() => requestImport(true)}
+                    disabled={importing || selectedCount === 0}
+                  >
+                    {importing ? 'מייבא...' : `ייבא מסומנים (${selectedCount})`}
+                  </Button>
+                </span>
+              </Tooltip>
+              <Tooltip title="ייבא את כל החדשים והשונים (ללא הספרים ללא שינוי)">
+                <span>
+                  <Button
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={() => requestImport(false)}
+                    disabled={importing || (newCount + changedCount === 0)}
+                  >
+                    {importing ? 'מייבא...' : `ייבא הכל (${newCount + changedCount})`}
+                  </Button>
+                </span>
+              </Tooltip>
+            </Stack>
+            {importing && <LinearProgress sx={{ mt: 2 }} />}
+          </Paper>
+
+          <TableContainer component={Paper} sx={{ maxHeight: 600 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ width: 40 }} />
+                  <TableCell sx={{ width: 80 }}>סטטוס</TableCell>
+                  <TableCell sx={{ width: 60 }}>בחר</TableCell>
+                  <TableCell>מס׳ מזהה</TableCell>
+                  <TableCell>שם הספר</TableCell>
+                  <TableCell>מחבר</TableCell>
+                  <TableCell>שדות שונו</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {visibleRows.map((row) => {
+                  const index = comparedRows.indexOf(row);
+                  return (
+                    <>
+                      <TableRow
+                        key={index}
+                        sx={{ bgcolor: rowBgColor(row), cursor: 'pointer' }}
+                        onClick={() => toggleRowExpanded(index)}
+                      >
+                        <TableCell padding="none" sx={{ pl: 1 }}>
+                          <IconButton size="small">
+                            {expandedRows.has(index) ? <CollapseIcon /> : <ExpandIcon />}
+                          </IconButton>
+                        </TableCell>
+                        <TableCell>{row.parsed.valid ? statusChip(row.status) : <Chip label="שגיאה" size="small" color="error" />}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          {row.parsed.valid && row.status !== 'unchanged' && (
+                            <input
+                              type="checkbox"
+                              checked={row.selected}
+                              onChange={() => toggleRowSelected(index)}
+                              style={{ width: 18, height: 18, cursor: 'pointer' }}
+                            />
+                          )}
+                        </TableCell>
+                        <TableCell>{row.parsed.internalId}</TableCell>
+                        <TableCell>{row.parsed.title}</TableCell>
+                        <TableCell>
+                          {row.parsed.authors.map((a) => `${a.firstName} ${a.lastName}`).join(', ')}
+                        </TableCell>
+                        <TableCell>
+                          {row.status === 'changed' && (
+                            <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+                              {row.changedFields.map((f) => (
+                                <Chip key={f} label={FIELD_LABELS[f] ?? f} size="small" variant="outlined" color="warning" />
+                              ))}
+                            </Box>
+                          )}
+                          {!row.parsed.valid && (
+                            <Typography variant="caption" color="error">
+                              {row.parsed.errors.join(', ')}
+                            </Typography>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                      <TableRow key={`${index}-detail`}>
+                        <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                          <Collapse in={expandedRows.has(index)} timeout="auto" unmountOnExit>
+                            <DiffDetails row={row} />
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </>
       )}
+
+      {/* ── Confirmation dialog ── */}
+      <Dialog open={confirmDialog.open} onClose={() => setConfirmDialog((prev) => ({ ...prev, open: false }))} maxWidth="xs" fullWidth>
+        <DialogTitle>אישור ייבוא</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {confirmDialog.addCount > 0 && (
+              <Box component="span" display="block">
+                ספרים חדשים שיווספו: <strong>{confirmDialog.addCount}</strong>
+              </Box>
+            )}
+            {confirmDialog.updateCount > 0 && (
+              <Box component="span" display="block">
+                ספרים קיימים שיעודכנו: <strong>{confirmDialog.updateCount}</strong>
+              </Box>
+            )}
+            <Box component="span" display="block" sx={{ mt: 1 }}>
+              האם להמשיך?
+            </Box>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmDialog((prev) => ({ ...prev, open: false }))}>ביטול</Button>
+          <Button variant="contained" onClick={confirmImport}>
+            אישור
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }
