@@ -27,7 +27,9 @@ export async function fetchBookByIsbn(isbn: string): Promise<GoogleBookData | nu
   // const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}`; // for testing without API key
   const apiKey = import.meta.env.VITE_GOOGLE_BOOKS_API_KEY;
   const keyParam = apiKey ? `&key=${apiKey}` : '';
-  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}${keyParam}`;
+  // Request only the fields we actually use, reducing payload size and server load
+  const fields = 'items(volumeInfo(title,subtitle,authors,publisher,pageCount,language,imageLinks/thumbnail,publishedDate))';
+  const url = `https://www.googleapis.com/books/v1/volumes?q=isbn:${isbn}&fields=${encodeURIComponent(fields)}${keyParam}`;
 
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Google Books API error: ${response.status}`);
