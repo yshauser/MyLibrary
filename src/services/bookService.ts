@@ -15,6 +15,7 @@ import {
   DocumentSnapshot,
   QueryConstraint,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import type { Book, BookFormData } from '../types/book';
@@ -129,7 +130,19 @@ export const bookService = {
 
   async updateBook(id: string, bookData: Partial<BookFormData>, performedBy?: string): Promise<void> {
     const docRef = doc(db, COLLECTION_NAME, id);
-    await updateDoc(docRef, removeUndefined(bookData as Record<string, unknown>));
+    // Build the update object: undefined values become deleteField() so Firestore removes them
+    const raw = bookData as Record<string, unknown>;
+    const updateData: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw)) {
+      if (value === undefined) {
+        updateData[key] = deleteField();
+      } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
+        updateData[key] = removeUndefined(value as Record<string, unknown>);
+      } else {
+        updateData[key] = value;
+      }
+    }
+    await updateDoc(docRef, updateData);
     if (performedBy && bookData.title) {
       activityLogService.logAction('edit', bookData.title, id, performedBy).catch(() => {});
     }

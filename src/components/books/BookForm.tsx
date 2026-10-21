@@ -263,22 +263,24 @@ export default function BookForm({ initialData, onSubmit, onCancel, isLoading, e
       currentLoan: initialData?.currentLoan || null,
     };
 
-    if (originalTitle) bookData.originalTitle = originalTitle;
-    if (language) bookData.language = language;
-    if (originalLanguage) bookData.originalLanguage = originalLanguage;
-    if (isbn) bookData.isbn = isbn;
+    bookData.originalTitle = originalTitle || '';
+    bookData.language = language || '';
+    bookData.originalLanguage = originalLanguage || '';
+    bookData.isbn = isbn || '';
     if (danacode) {
       const longCode = toLongDanacode(danacode);
-      if (longCode) bookData.danacode = longCode;
+      bookData.danacode = longCode || '';
+    } else {
+      bookData.danacode = '';
     }
-    if (publishedYear) bookData.publishedYear = parseInt(publishedYear);
-    if (translatedBy) bookData.translatedBy = translatedBy;
-    if (translationPublishingYear) bookData.translationPublishingYear = parseInt(translationPublishingYear);
-    if (publishingHouse) bookData.publishingHouse = publishingHouse;
-    if (edition) bookData.edition = edition;
-    if (numberOfPages) bookData.numberOfPages = parseInt(numberOfPages);
-    if (weight) bookData.weight = parseFloat(weight);
-    if (coverImageUrl) bookData.coverImageUrl = coverImageUrl;
+    bookData.publishedYear = publishedYear ? parseInt(publishedYear) : undefined;
+    bookData.translatedBy = translatedBy || '';
+    bookData.translationPublishingYear = translationPublishingYear ? parseInt(translationPublishingYear) : undefined;
+    bookData.publishingHouse = publishingHouse || '';
+    bookData.edition = edition || '';
+    bookData.numberOfPages = numberOfPages ? parseInt(numberOfPages) : undefined;
+    bookData.weight = weight ? parseFloat(weight) : undefined;
+    bookData.coverImageUrl = coverImageUrl || '';
 
     if (hasSeries && seriesName) {
       bookData.series = {
